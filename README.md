@@ -175,7 +175,9 @@ The good option is for each friend to have **their own copy**:
 - **Climb** is from lightly smoothed height data, ignoring wobbles under 1 m.
 - **"How it went"** notes are simple rules in [`analysis.py`](analysis.py) (`summarise`): first km
   vs the rest (±4%), first half vs second half (±2–3%), and heart rate rising ≥3 bpm while pace held.
-- **Hard runs**: average heart rate above 85% of the max heart rate set on the Overview page.
+- **This week's check-in** covers Monday to today. **Hard runs**: average heart rate above 85% of the
+  max heart rate set on the Overview page (flagged if more than 2). **Longest run** is compared with
+  the longest in the 3 full weeks before (flagged if more than 10% further).
 - **Duplicates** (same start within 2 minutes, distance within 5%) are shown greyed out and left
   out of totals and PBs.
 

@@ -1,7 +1,7 @@
 // Overview: personal bests, the last 8 weeks, and a gentle check on the past 7 days.
 
 const HARD_SHARE = 0.85;      // a run is "hard" if it averaged above 85% of your max heart rate
-const LONG_JUMP = 0.10;       // flag a longest run more than 10% longer than recent weeks
+const LONG_JUMP = 0.10;       // flag a longest run more than 10% longer than the 3 weeks before
 let weekMetric = "distance";
 
 async function renderOverview() {
@@ -93,13 +93,13 @@ function renderWeeks(runs) {
   draw();
 }
 
-// ---------------------------------------------------------------- the past 7 days
+// ---------------------------------------------------------------- this week (Monday to today)
 
 function renderEffort(runs, maxHr) {
-  const now = new Date();
-  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
-  const fourWeeksAgo = new Date(now); fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
-  const recent = runs.filter((r) => runDate(r) >= weekAgo);
+  // "This week" = Monday to today, the same weeks as the Week by week chart.
+  const weekStart = mondayOf(new Date());
+  const threeWeeksBefore = new Date(weekStart); threeWeeksBefore.setDate(threeWeeksBefore.getDate() - 21);
+  const recent = runs.filter((r) => runDate(r) >= weekStart);
   const threshold = Math.round(maxHr * HARD_SHARE);
   const withHr = recent.filter((r) => r.stats.avg_hr);
   const hard = withHr.filter((r) => r.stats.avg_hr >= threshold);
@@ -120,17 +120,17 @@ function renderEffort(runs, maxHr) {
   // Long-run jump
   const longest = (list) => list.reduce((best, r) => (runKm(r) > (best ? runKm(best) : 0) ? r : best), null);
   const thisWeek = longest(recent);
-  const before = longest(runs.filter((r) => runDate(r) >= fourWeeksAgo && runDate(r) < weekAgo));
+  const before = longest(runs.filter((r) => runDate(r) >= threeWeeksBefore && runDate(r) < weekStart));
   if (!thisWeek) {
-    items.push(effortItem(false, "No runs yet", "Nothing to compare – enjoy the rest."));
+    items.push(effortItem(false, "No runs yet this week", "Nothing to check – enjoy the rest."));
   } else if (!before) {
     items.push(effortItem(false, `Longest run ${fmt.km(runKm(thisWeek))}`,
-      "No runs in the 3 weeks before to compare with yet."));
+      "No runs in the 3 weeks before this one to compare with yet."));
   } else {
     const jump = runKm(thisWeek) / runKm(before) - 1;
     const pct = Math.round(jump * 100);
     const head = `Longest run ${fmt.km(runKm(thisWeek))}`;
-    const base = `the 3 weeks before (${fmt.km(runKm(before))})`;
+    const base = `your longest in the 3 weeks before (${fmt.km(runKm(before))})`;
     if (jump > LONG_JUMP) {
       items.push(effortItem(true, head,
         `Up ${pct}% on ${base}. Growing your longest run 10–15% at a time gives your legs time to adapt` +
@@ -140,6 +140,7 @@ function renderEffort(runs, maxHr) {
         `${pct >= 0 ? `Up ${pct}%` : `Down ${-pct}%`} on ${base} – a comfortable step.`));
     }
   }
+  $("effort-since").textContent = `Monday ${weekStart.toLocaleDateString(undefined, { day: "numeric", month: "short" })} to today.`;
   $("effort-items").replaceChildren(...items);
 }
 
