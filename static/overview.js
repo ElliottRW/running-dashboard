@@ -100,19 +100,27 @@ function renderEffort(runs, maxHr) {
   const weekStart = mondayOf(new Date());
   const threeWeeksBefore = new Date(weekStart); threeWeeksBefore.setDate(threeWeeksBefore.getDate() - 21);
   const recent = runs.filter((r) => runDate(r) >= weekStart);
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeek = runs.filter((r) => runDate(r) >= lastWeekStart && runDate(r) < weekStart);
   const threshold = Math.round(maxHr * HARD_SHARE);
   const withHr = recent.filter((r) => r.stats.avg_hr);
   const hard = withHr.filter((r) => r.stats.avg_hr >= threshold);
   const items = [];
 
-  // Hard runs
-  const hardText = `${hard.length} hard run${hard.length === 1 ? "" : "s"}`;
+  // Hard runs – this week, with last week alongside for context
+  const hardCount = (list) => list.filter((r) => r.stats.avg_hr && r.stats.avg_hr >= threshold).length;
+  const ofRuns = (n, total) => `${n} hard run${n === 1 ? "" : "s"}${total ? ` of ${total}` : ""}`;
+  const hardText = ofRuns(hard.length, recent.length);
+  const lastHard = hardCount(lastWeek);
+  const lastText = lastWeek.length
+    ? `Last week: ${ofRuns(lastHard, lastWeek.length)}.`
+    : "Last week: no runs.";
   const explain = `Hard means averaging above 85% of your max heart rate (${threshold} bpm).`;
   if (hard.length > 2) {
     items.push(effortItem(true, hardText,
-      `${explain} Most runs are best kept easy, at a pace you could chat at – try making the next one or two gentler.`));
+      `${explain} Most runs are best kept easy, at a pace you could chat at – try making the next one or two gentler.`, lastText));
   } else {
-    items.push(effortItem(false, hardText, explain));
+    items.push(effortItem(false, hardText, explain, lastText));
   }
   if (recent.length > withHr.length)
     items.push(el("p", { class: "muted small" }, `${recent.length - withHr.length} run(s) had no heart rate and aren't counted.`));
@@ -144,12 +152,13 @@ function renderEffort(runs, maxHr) {
   $("effort-items").replaceChildren(...items);
 }
 
-function effortItem(flag, head, text) {
+function effortItem(flag, head, text, extra) {
   return el("div", { class: `effort ${flag ? "flag" : "ok"}` },
     el("span", { class: "note-icon", "aria-hidden": "true" }),
     el("div", {},
       el("div", { class: "effort-head" }, el("span", { class: "sr-only" }, flag ? "Worth knowing: " : "Looks fine: "), head),
-      el("div", { class: "small" }, text)));
+      el("div", { class: "small" }, text),
+      extra ? el("div", { class: "small effort-extra" }, extra) : null));
 }
 
 // ---------------------------------------------------------------- settings

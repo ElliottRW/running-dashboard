@@ -462,3 +462,4 @@ span.tag { cursor: default; }
   background: var(--t, var(--wash)); font-variant-numeric: tabular-nums; font-weight: 550;
 }
 .pill.empty { background: none; color: var(--faint); font-weight: 400; }
+.effort-extra { margin-top: 6px; color: var(--text); }
