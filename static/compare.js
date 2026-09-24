@@ -64,8 +64,7 @@ function pickerCard(ids) {
 
   return el("section", { class: "card" },
     el("h2", {}, "Compare runs"),
-    el("p", { class: "muted small" }, "Pick 2 to 4 runs. They're lined up by distance, so you can see where each one was at the same point. ",
-      "Treadmill runs without a distance recording can't be compared."),
+    el("p", { class: "muted small" }, "Pick 2–4 runs. They're lined up by distance; the first one is the reference."),
     el("div", { class: "picks" }, ...chips),
     el("label", { class: "add-run" }, select));
 }
@@ -150,7 +149,7 @@ function buildCompare(page, data) {
   const tbody = el("tbody");
   const posCard = el("section", { class: "card" },
     el("h2", {}, "At the same distance"),
-    el("p", { class: "muted small" }, "Drag the slider, or hover over (tap) the chart below, to choose a point in the run."),
+    el("p", { class: "muted small" }, "Drag the slider or hover over the chart to pick a point."),
     el("div", { class: "slider-row" }, el("span", { class: "muted small" }, "0 km"), slider, el("span", { class: "muted small" }, fmt.km(maxM, 1))),
     el("p", { class: "pos-label" }, "At ", posLabel),
     el("div", { class: "table-wrap" }, el("table", { class: "compare-table" },
@@ -183,7 +182,7 @@ function buildCompare(page, data) {
 
   page.append(
     notes.length ? el("section", { class: "card" }, el("h2", {}, "What stands out"),
-      el("ul", { class: "notes" }, ...notes.map((n) => el("li", {}, n)))) : null,
+      el("ul", { class: "notes" }, ...notes.map((n) => el("li", {}, el("span", { class: "note-icon", "aria-hidden": "true" }), el("span", {}, n))))) : null,
     mapCard, posCard, chartCard);
 
   // ----- behaviour -----

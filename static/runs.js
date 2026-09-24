@@ -27,15 +27,15 @@ function renderPBs(pbs, runs) {
         el("div", { class: "pb-label" }, label),
         el("div", { class: "pb-value muted" }, "Not yet"),
         el("div", { class: "pb-sub" }, longest
-          ? `Needs a GPS run of ${need} km or more – your longest so far is ${fmt.km(longest.distance_m)}.`
-          : `Needs a GPS run of ${need} km or more.`)));
+          ? `Needs a ${need} km run – longest so far ${fmt.km(longest.distance_m)}.`
+          : `Needs a ${need} km GPS run.`)));
       continue;
     }
-    grid.append(pbCard(label, fmt.duration(b.seconds), `${fmt.pace(b.seconds / (pb.metres / 1000))} average`, b, pb,
+    grid.append(pbCard(label, fmt.duration(b.seconds), fmt.pace(b.seconds / (pb.metres / 1000)), b, pb,
       pb.previous && pb.previous.run_id !== b.run_id
         ? `${fmt.duration(pb.previous.seconds - b.seconds)} faster than before (${fmt.duration(pb.previous.seconds)})`
         : null,
-      b.start_m >= 100 ? `from ${fmt.km(b.start_m, 1)} into the run` : "from the start of the run"));
+      b.start_m >= 100 ? `from ${fmt.km(b.start_m, 1)}` : null));
   }
 
   const L = pbs.longest;
@@ -49,7 +49,7 @@ function renderPBs(pbs, runs) {
 
 function pbCard(label, value, sub, best, pb, improvement, where) {
   return el("div", { class: `pb${pb.is_new ? " is-new" : ""}` },
-    el("div", { class: "pb-label" }, label, pb.is_new ? el("span", { class: "new-pb" }, "★ New PB") : null),
+    el("div", { class: "pb-label" }, label, pb.is_new ? el("span", { class: "new-pb" }, "New best") : null),
     el("div", { class: "pb-value" }, value),
     sub ? el("div", { class: "pb-sub" }, sub) : null,
     pb.is_new && improvement ? el("div", { class: "pb-sub strong" }, improvement) : null,

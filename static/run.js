@@ -45,7 +45,8 @@ async function renderRunPage(id) {
     el("h2", {}, "How it went"),
     el("ul", { class: "notes" }, ...detail.summary.map((n) =>
       el("li", { class: n.flag ? "flag" : "" },
-        n.flag ? el("span", { class: "note-label" }, "Worth knowing") : null, n.text)))) : null;
+        el("span", { class: "note-icon", "aria-hidden": "true" }),
+        el("span", {}, n.flag ? el("span", { class: "sr-only" }, "Worth knowing: ") : null, n.text))))) : null;
 
   // ----- map -----
   let mapCard = null;
@@ -153,8 +154,8 @@ function splitsSection(splits, avgPace) {
   return el("section", { class: "card" },
     el("h2", {}, "Km splits"),
     el("p", { class: "muted small" },
-      "A “split” is the time for each kilometre. Longer bar = faster km; the thin line marks your average pace. ",
-      "Heart rate is the average for that km, and height is how much you went up (+) or down (−)."),
+      "Your time for each kilometre (a “split”). Longer bar = faster; the line marks your average. ",
+      "Height is how much you climbed (+) or dropped (−)."),
     el("div", { class: "splits", role: "table", "aria-label": "Kilometre splits" },
       el("div", { class: "split-row split-head", role: "row" },
         el("div", { role: "columnheader" }, "Km"), el("div", { role: "columnheader" }, ""),
@@ -194,9 +195,9 @@ function drawProfile() {
   const m = METRICS[profileMetric];
   document.querySelectorAll(".seg-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === m.label)));
   $("profile-note").textContent = {
-    elevation: "Height above sea level, lightly smoothed so GPS wobble doesn't look like hills.",
-    pace: "Pace smoothed over about 30 seconds so GPS jitter doesn't look like surges. Faster is higher up. Gaps are where you stopped.",
-    hr: "Heart rate in beats per minute.",
+    elevation: "Height above sea level, lightly smoothed.",
+    pace: "Smoothed over ~30 seconds. Faster is higher; gaps are stops.",
+    hr: "Beats per minute.",
   }[profileMetric];
 
   const xs = d.series.x_km || d.series.x_min;

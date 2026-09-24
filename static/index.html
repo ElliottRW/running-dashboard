@@ -19,7 +19,7 @@
     </nav>
     <div class="sync-area">
       <span id="last-sync" class="muted small"></span>
-      <button id="sync-btn" class="btn" hidden>Sync now</button>
+      <button id="sync-btn" class="btn" hidden>Sync</button>
       <a id="update-btn" class="btn" hidden target="_blank" rel="noopener">Update</a>
     </div>
   </header>
@@ -27,8 +27,8 @@
   <main>
     <!-- Website only: password screen -->
     <section id="card-lock" class="card lock" hidden>
-      <h2>This dashboard is private</h2>
-      <p class="muted small">Enter the password to unlock it. It's checked on this device only.</p>
+      <h2>My Runs</h2>
+      <p class="muted small">Private dashboard. Enter the password to unlock.</p>
       <form id="lock-form">
         <label class="field">Password
           <input id="lock-password" type="password" autocomplete="current-password" required>
@@ -75,12 +75,11 @@
     <div id="page-overview" hidden>
       <section id="pbs" class="card" hidden>
         <h2>Personal bests</h2>
-        <p class="muted small">Your fastest 1 km, 5 km and 10 km <em>anywhere inside</em> a run, not just from
-          the start. Worked out from your GPS track; treadmill runs aren't counted because their distance is
-          only estimated.</p>
+        <p class="muted small">Fastest stretch found anywhere inside a run, measured from GPS. Treadmill runs aren't counted.</p>
         <div id="pb-grid" class="pb-grid"></div>
       </section>
 
+      <div class="overview-grid">
       <section class="card">
         <h2>Last 7 days</h2>
         <div id="effort-items" class="effort-list"></div>
@@ -95,7 +94,7 @@
             <button type="button" class="seg-btn" data-m="time">Time</button>
           </div>
         </div>
-        <p class="muted small"><span id="week-unit"></span> The last 8 weeks, Monday to Sunday; the striped bar is this week so far.</p>
+        <p class="muted small"><span id="week-unit"></span> Striped bar = this week so far.</p>
         <div id="week-cols" class="week-cols"></div>
         <details class="table-toggle">
           <summary class="small">Show as a table</summary>
@@ -107,6 +106,7 @@
           </div>
         </details>
       </section>
+      </div>
 
       <section class="card">
         <h2>Settings</h2>
@@ -116,9 +116,8 @@
           </label>
           <button class="btn" type="submit">Save</button>
         </form>
-        <p class="muted small">Used to decide which runs were “hard”. If you don't know yours, 185 is a reasonable
-          starting point. The often-quoted “220 minus your age” is only a rough guess – real maximums vary a lot
-          from person to person. <span id="max-hr-where"></span></p>
+        <p class="muted small">Used to decide which runs were “hard”. 185 is a fair starting point; “220 minus your age”
+          is only a rough guess. <span id="max-hr-where"></span></p>
         <p id="max-hr-hint" class="small"></p>
         <p id="settings-msg" class="small" role="status"></p>
       </section>
@@ -133,8 +132,7 @@
             <select id="tag-filter"><option value="">all runs</option></select>
           </label>
         </div>
-        <p class="muted small">Pace is minutes per km, using time spent moving (stops at traffic lights
-          don't count). <span id="tag-hint">Tap a tag to add your own label.</span></p>
+        <p class="muted small">Pace per km uses moving time. <span id="tag-hint">Tap a tag to label a run.</span></p>
         <div class="table-wrap">
           <table class="runs-table">
             <thead><tr>

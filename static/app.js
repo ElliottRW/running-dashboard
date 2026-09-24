@@ -50,7 +50,7 @@ function renderSync(status) {
   const showCard = s.running || s.phase === "paused" || s.error_kind === "daily_limit";
   card.hidden = !showCard;
   $("sync-btn").disabled = s.running;
-  $("sync-btn").textContent = s.running ? "Syncing…" : "Sync now";
+  $("sync-btn").textContent = s.running ? "Syncing…" : "Sync";
   $("last-sync").textContent = `Last synced: ${timeAgo(status.last_sync)}`;
 
   if (!showCard) return;

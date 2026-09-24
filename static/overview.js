@@ -87,49 +87,49 @@ function renderEffort(runs, maxHr) {
   const items = [];
 
   // Hard runs
-  const hardText = `${hard.length} hard run${hard.length === 1 ? "" : "s"} in the last 7 days`;
-  const explain = `A run counts as “hard” when your average heart rate was above 85% of your max (${threshold} bpm with your max set to ${maxHr}).`;
+  const hardText = `${hard.length} hard run${hard.length === 1 ? "" : "s"}`;
+  const explain = `Hard means averaging above 85% of your max heart rate (${threshold} bpm).`;
   if (hard.length > 2) {
     items.push(effortItem(true, hardText,
-      `${explain} Most running advice suggests keeping the majority of runs easy – at a pace where you could chat – ` +
-      `so it might be worth making your next run or two gentler.`));
+      `${explain} Most runs are best kept easy, at a pace you could chat at – try making the next one or two gentler.`));
   } else {
     items.push(effortItem(false, hardText, explain));
   }
   if (recent.length > withHr.length)
-    items.push(el("p", { class: "muted small" }, `${recent.length - withHr.length} run(s) this week had no heart rate, so they aren't counted.`));
+    items.push(el("p", { class: "muted small" }, `${recent.length - withHr.length} run(s) had no heart rate and aren't counted.`));
 
   // Long-run jump
   const longest = (list) => list.reduce((best, r) => (runKm(r) > (best ? runKm(best) : 0) ? r : best), null);
   const thisWeek = longest(recent);
   const before = longest(runs.filter((r) => runDate(r) >= fourWeeksAgo && runDate(r) < weekAgo));
   if (!thisWeek) {
-    items.push(effortItem(false, "No runs in the last 7 days", "Nothing to compare yet – enjoy the rest!"));
+    items.push(effortItem(false, "No runs yet", "Nothing to compare – enjoy the rest."));
   } else if (!before) {
-    items.push(effortItem(false, `Longest run this week: ${fmt.km(runKm(thisWeek))}`,
-      "There aren't any runs from the 3 weeks before this one to compare with yet."));
+    items.push(effortItem(false, `Longest run ${fmt.km(runKm(thisWeek))}`,
+      "No runs in the 3 weeks before to compare with yet."));
   } else {
     const jump = runKm(thisWeek) / runKm(before) - 1;
     const pct = Math.round(jump * 100);
-    const head = `Longest run this week: ${fmt.km(runKm(thisWeek))}`;
-    const base = `Your longest in the 3 weeks before was ${fmt.km(runKm(before))}`;
+    const head = `Longest run ${fmt.km(runKm(thisWeek))}`;
+    const base = `the 3 weeks before (${fmt.km(runKm(before))})`;
     if (jump > LONG_JUMP) {
       items.push(effortItem(true, head,
-        `${base}, so that's ${pct}% further. A common rule of thumb is to grow your longest run by no more than ` +
-        `about 10–15% at a time, to give your legs time to adapt. ${jump > 0.15 ? "That's a big step – maybe hold at this distance for a week or two." : "Worth keeping an eye on."}`));
+        `Up ${pct}% on ${base}. Growing your longest run 10–15% at a time gives your legs time to adapt` +
+        `${jump > 0.15 ? " – maybe hold here for a week or two." : "."}`));
     } else {
       items.push(effortItem(false, head,
-        `${base}, so ${pct >= 0 ? `${pct}% further` : `${-pct}% shorter`} – a comfortable step${pct < 0 ? " (or a lighter week)" : ""}.`));
+        `${pct >= 0 ? `Up ${pct}%` : `Down ${-pct}%`} on ${base} – a comfortable step.`));
     }
   }
   $("effort-items").replaceChildren(...items);
 }
 
 function effortItem(flag, head, text) {
-  return el("div", { class: `effort${flag ? " flag" : ""}` },
-    flag ? el("span", { class: "note-label" }, "Worth knowing") : el("span", { class: "note-label ok" }, "Looks fine"),
-    el("div", { class: "effort-head" }, head),
-    el("div", { class: "small" }, text));
+  return el("div", { class: `effort ${flag ? "flag" : "ok"}` },
+    el("span", { class: "note-icon", "aria-hidden": "true" }),
+    el("div", {},
+      el("div", { class: "effort-head" }, el("span", { class: "sr-only" }, flag ? "Worth knowing: " : "Looks fine: "), head),
+      el("div", { class: "small" }, text)));
 }
 
 // ---------------------------------------------------------------- settings
