@@ -63,7 +63,7 @@ function pickerCard(ids) {
   });
 
   return el("section", { class: "card" },
-    el("h2", {}, "Compare runs"),
+    el("h2", {}, "Head to head"),
     el("p", { class: "muted small" }, "Pick 2–4 runs. They're lined up by distance; the first one is the reference."),
     el("div", { class: "picks" }, ...chips),
     el("label", { class: "add-run" }, select));
@@ -135,7 +135,7 @@ function buildCompare(page, data) {
   // ----- map -----
   const hasMap = gpsCount > 0;
   const mapCard = hasMap ? el("section", { class: "card" },
-    el("h2", {}, "Routes"),
+    el("h2", {}, "The routes"),
     legend(runs),
     el("div", { id: "compare-map", class: "map" }),
     el("p", { class: "muted small legend-line" },
@@ -148,7 +148,7 @@ function buildCompare(page, data) {
   const posLabel = el("strong", {});
   const tbody = el("tbody");
   const posCard = el("section", { class: "card" },
-    el("h2", {}, "At the same distance"),
+    el("h2", {}, "Where was everyone?"),
     el("p", { class: "muted small" }, "Drag the slider or hover over the chart to pick a point."),
     el("div", { class: "slider-row" }, el("span", { class: "muted small" }, "0 km"), slider, el("span", { class: "muted small" }, fmt.km(maxM, 1))),
     el("p", { class: "pos-label" }, "At ", posLabel),
@@ -173,7 +173,7 @@ function buildCompare(page, data) {
   const chartNote = el("p", { class: "muted small" });
   const chartCard = el("section", { class: "card" },
     el("div", { class: "list-head" },
-      el("h2", {}, "By distance"),
+      el("h2", {}, "Along the way"),
       el("div", { class: "segmented", role: "group", "aria-label": "Show" },
         ...Object.entries(metrics).filter(([, m]) => m.ok).map(([k, m]) =>
           el("button", { type: "button", class: "seg-btn", "aria-pressed": String(k === compareMetric),
@@ -181,7 +181,7 @@ function buildCompare(page, data) {
     chartNote, legend(runs), chartBox);
 
   page.append(
-    notes.length ? el("section", { class: "card" }, el("h2", {}, "What stands out"),
+    notes.length ? el("section", { class: "card" }, el("h2", {}, "The verdict"),
       el("ul", { class: "notes" }, ...notes.map((n) => el("li", {}, el("span", { class: "note-icon", "aria-hidden": "true" }), el("span", {}, n))))) : null,
     mapCard, posCard, chartCard);
 

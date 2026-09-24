@@ -49,7 +49,7 @@ function renderPBs(pbs, runs) {
 
 function pbCard(label, value, sub, best, pb, improvement, where) {
   return el("div", { class: `pb${pb.is_new ? " is-new" : ""}` },
-    el("div", { class: "pb-label" }, label, pb.is_new ? el("span", { class: "new-pb" }, "New best") : null),
+    el("div", { class: "pb-label" }, label, pb.is_new ? el("span", { class: "new-pb" }, "New best 🎉") : null),
     el("div", { class: "pb-value" }, value),
     sub ? el("div", { class: "pb-sub" }, sub) : null,
     pb.is_new && improvement ? el("div", { class: "pb-sub strong" }, improvement) : null,
@@ -92,7 +92,7 @@ function renderRunList() {
   $("run-rows").replaceChildren(...shown.map((r) => {
     const s = r.stats || {};
     const noHr = r.streams_status === "done" && !r.has_hr;
-    return el("tr", { class: r.duplicate_of ? "is-dup" : "" },
+    const row = el("tr", { class: `run-row${r.duplicate_of ? " is-dup" : ""}` },
       el("td", { class: "date", "data-label": "Date" },
         el("div", {}, fmt.day(r.start_date_local)),
         el("div", { class: "muted small" }, fmt.clock(r.start_date_local))),
@@ -106,6 +106,12 @@ function renderRunList() {
       el("td", { class: "num", "data-label": "Avg HR" }, noHr ? "—" : fmt.bpm(s.avg_hr)),
       el("td", { class: "num", "data-label": "Max HR" }, noHr ? "—" : fmt.bpm(s.max_hr)),
       el("td", { class: "num", "data-label": "Climb" }, fmt.metres(s.elev_gain_m)));
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("button, input, a, select")) return;   // let the tag chip and link do their own thing
+      if (window.getSelection().toString()) return;                // don't jump away while selecting text
+      location.hash = `#/run/${r.id}`;
+    });
+    return row;
   }));
 }
 

@@ -10,9 +10,28 @@ async function renderOverview() {
   renderPBs(data.pbs, data.runs);
 
   const runs = data.runs.filter((r) => r.stats && !r.duplicate_of);
+  renderHello(runs, await DATA.status());
   renderWeeks(runs);
   renderEffort(runs, maxHr);
   renderSettings(runs, maxHr);
+}
+
+// ---------------------------------------------------------------- greeting
+
+function renderHello(runs, status) {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const first = (status.athlete_name || "").split(" ")[0];
+  $("hello-title").textContent = `${part}${first ? `, ${first}` : ""} 👋`;
+  const sub = $("hello-sub");
+  if (!runs.length) { sub.textContent = "No runs yet – your first one will show up here."; return; }
+  const km = runs.reduce((a, r) => a + runKm(r), 0) / 1000;
+  const last = runs.reduce((a, r) => (runDate(r) > runDate(a) ? r : a));
+  const days = Math.floor((startOfDay(new Date()) - startOfDay(runDate(last))) / 86400000);
+  const when = days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+  sub.replaceChildren(
+    el("strong", {}, `${runs.length} run${runs.length === 1 ? "" : "s"}`), " and ",
+    el("strong", {}, `${km.toFixed(1)} km`), ` in the bag so far. Last out ${when}.`);
 }
 
 // ---------------------------------------------------------------- dates

@@ -52,7 +52,7 @@ async function renderRunPage(id) {
   let mapCard = null;
   if (detail.has_gps) {
     mapCard = el("section", { class: "card" },
-      el("h2", {}, "Route"),
+      el("h2", {}, "The route"),
       el("div", { id: "run-map", class: "map" }),
       el("p", { class: "muted small legend-line" },
         el("span", { class: "key-dot start" }, "S"), " start · ",
@@ -152,7 +152,7 @@ function splitsSection(splits, avgPace) {
       el("div", { class: "split-elev num", role: "cell" }, elev));
   });
   return el("section", { class: "card" },
-    el("h2", {}, "Km splits"),
+    el("h2", {}, "Kilometre by kilometre"),
     el("p", { class: "muted small" },
       "Your time for each kilometre (a “split”). Longer bar = faster; the line marks your average. ",
       "Height is how much you climbed (+) or dropped (−)."),
@@ -183,7 +183,7 @@ function profileSection(d) {
       onclick: () => { profileMetric = k; drawProfile(); } }, m.label));
   return el("section", { class: "card" },
     el("div", { class: "list-head" },
-      el("h2", {}, d.series.x_km ? "Profile by distance" : "Heart rate over time"),
+      el("h2", {}, d.series.x_km ? "Along the way" : "Heart rate over time"),
       el("div", { class: "segmented", role: "group", "aria-label": "Show" }, ...buttons)),
     el("p", { class: "muted small", id: "profile-note" }),
     el("div", { id: "profile-chart", class: "chart", tabindex: "0",

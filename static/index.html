@@ -27,8 +27,8 @@
   <main>
     <!-- Website only: password screen -->
     <section id="card-lock" class="card lock" hidden>
-      <h2>My Runs</h2>
-      <p class="muted small">Private dashboard. Enter the password to unlock.</p>
+      <h2>Welcome back 👋</h2>
+      <p class="muted small">Pop in your password to see your runs.</p>
       <form id="lock-form">
         <label class="field">Password
           <input id="lock-password" type="password" autocomplete="current-password" required>
@@ -73,21 +73,25 @@
 
     <!-- ============ Overview ============ -->
     <div id="page-overview" hidden>
+      <header class="hello">
+        <h1 id="hello-title">Hello 👋</h1>
+        <p id="hello-sub"></p>
+      </header>
       <section id="pbs" class="card" hidden>
-        <h2>Personal bests</h2>
+        <h2>Your bests</h2>
         <p class="muted small">Fastest stretch found anywhere inside a run, measured from GPS. Treadmill runs aren't counted.</p>
         <div id="pb-grid" class="pb-grid"></div>
       </section>
 
       <div class="overview-grid">
       <section class="card">
-        <h2>Last 7 days</h2>
+        <h2>This week's check-in</h2>
         <div id="effort-items" class="effort-list"></div>
       </section>
 
       <section id="weeks" class="card">
         <div class="list-head">
-          <h2>Weekly totals</h2>
+          <h2>Week by week</h2>
           <div class="segmented" role="group" aria-label="Show">
             <button type="button" class="seg-btn" data-m="distance">Distance</button>
             <button type="button" class="seg-btn" data-m="runs">Runs</button>
@@ -127,12 +131,12 @@
     <div id="page-list" hidden>
       <section id="runs" class="card" hidden>
         <div class="list-head">
-          <h2>Runs <span id="run-count" class="muted small"></span></h2>
+          <h2>All your runs <span id="run-count" class="muted small"></span></h2>
           <label class="small filter">Show
             <select id="tag-filter"><option value="">all runs</option></select>
           </label>
         </div>
-        <p class="muted small">Pace per km uses moving time. <span id="tag-hint">Tap a tag to label a run.</span></p>
+        <p class="muted small">Pace per km uses moving time. <span id="tag-hint">Tap a run to open it, or “+ tag” to label it.</span></p>
         <div class="table-wrap">
           <table class="runs-table">
             <thead><tr>
