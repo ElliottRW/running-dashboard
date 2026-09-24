@@ -170,8 +170,19 @@ def build(pw):
 
     shutil.rmtree(SITE_DIR, ignore_errors=True)
     shutil.copytree(os.path.join(HERE, "static"), os.path.join(SITE_DIR, "static"))
-    shutil.copy(os.path.join(HERE, "static", "index.html"), os.path.join(SITE_DIR, "index.html"))
     os.remove(os.path.join(SITE_DIR, "static", "index.html"))
+    # Give every stylesheet/script a version tag based on its contents, so phones fetch
+    # the new design straight away instead of using a cached copy for up to 10 minutes.
+    with open(os.path.join(HERE, "static", "index.html")) as f:
+        page = f.read()
+    for name in sorted(os.listdir(os.path.join(HERE, "static"))):
+        if name.endswith((".css", ".js")) and name != "config.js":
+            with open(os.path.join(HERE, "static", name), "rb") as f:
+                version = hashlib.sha256(f.read()).hexdigest()[:10]
+            page = page.replace(f'"static/{name}"', f'"static/{name}?v={version}"')
+    page = page.replace('"static/config.js"', f'"static/config.js?v={os.urandom(4).hex()}"')
+    with open(os.path.join(SITE_DIR, "index.html"), "w") as f:
+        f.write(page)
     repo = os.environ.get("GITHUB_REPOSITORY")
     config = {"mode": "static"}
     if repo:

@@ -70,7 +70,7 @@
     --accent-text: #151412;
     --accent-soft: #2a2723;
     --link: #f3efe8;
-    --tint-1: #1b2636; --tint-2: #33231a; --tint-3: #172d24; --tint-4: #272036;
+    --tint-1: #1f3a63; --tint-2: #5a3120; --tint-3: #1a4a37; --tint-4: #3d2d63;
     --flag: #f07a3e;
     --flag-bg: #2a1a12;
     --good: #4cc38a;
@@ -215,7 +215,7 @@ td.date { white-space: nowrap; }
 .pb:nth-child(4) { background: var(--tint-4); }
 .pb-label { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
 .pb-value { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; margin: 8px 0 6px; }
-.pb.empty .pb-value { color: var(--faint); font-weight: 500; }
+.pb.empty .pb-value { color: var(--muted); font-weight: 600; }
 .pb-sub { font-size: 0.8rem; color: var(--muted); }
 .pb-sub.strong { color: var(--text); font-weight: 600; }
 .pb.is-new { box-shadow: 0 0 0 2px var(--text) inset; }
