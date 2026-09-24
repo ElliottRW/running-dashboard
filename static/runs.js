@@ -100,12 +100,12 @@ function renderRunList() {
         el("div", { class: "run-name" }, el("a", { href: `#/run/${r.id}` }, r.name), newIds.has(r.id) ? el("span", { class: "new-run" }, "new") : null),
         el("div", { class: "badges" }, tagChip(r), ...runBadges(r))),
       el("td", { class: "num", "data-label": "Distance", title: s.distance_source === "summary" ? "Strava's distance – no recording to measure from" : null },
-        fmt.km(s.distance_m ?? r.summary_distance)),
-      el("td", { class: "num", "data-label": "Time" }, fmt.duration(s.moving_s ?? r.moving_time)),
-      el("td", { class: "num", "data-label": "Pace" }, fmt.pace(s.pace_s_per_km)),
-      el("td", { class: "num", "data-label": "Avg HR" }, noHr ? "—" : fmt.bpm(s.avg_hr)),
-      el("td", { class: "num", "data-label": "Max HR" }, noHr ? "—" : fmt.bpm(s.max_hr)),
-      el("td", { class: "num", "data-label": "Climb" }, fmt.metres(s.elev_gain_m)));
+        pill("distance", fmt.km(s.distance_m ?? r.summary_distance))),
+      el("td", { class: "num", "data-label": "Time" }, pill("time", fmt.duration(s.moving_s ?? r.moving_time))),
+      el("td", { class: "num", "data-label": "Pace" }, pill("pace", fmt.pace(s.pace_s_per_km))),
+      el("td", { class: "num", "data-label": "Avg HR" }, pill("hr", noHr ? "—" : fmt.bpm(s.avg_hr))),
+      el("td", { class: "num", "data-label": "Max HR" }, pill("maxhr", noHr ? "—" : fmt.bpm(s.max_hr))),
+      el("td", { class: "num", "data-label": "Climb" }, pill("climb", fmt.metres(s.elev_gain_m))));
     row.addEventListener("click", (e) => {
       if (e.target.closest("button, input, a, select")) return;   // let the tag chip and link do their own thing
       if (window.getSelection().toString()) return;                // don't jump away while selecting text
@@ -113,6 +113,11 @@ function renderRunList() {
     });
     return row;
   }));
+}
+
+// A number in its stat's colour ("—" stays plain)
+function pill(kind, text) {
+  return el("span", { class: `pill stat-${kind}${text === "—" ? " empty" : ""}` }, text);
 }
 
 // ---------- your own tags ----------

@@ -21,22 +21,22 @@ async function renderRunPage(id) {
 
   // ----- header -----
   const tiles = [
-    ["Distance", fmt.km(s.distance_m ?? run.summary_distance)],
-    ["Moving time", fmt.duration(s.moving_s ?? run.moving_time)],
-    ["Average pace", fmt.pace(s.pace_s_per_km)],
-    ["Avg heart rate", noHr ? "—" : `${fmt.bpm(s.avg_hr)} bpm`],
-    ["Max heart rate", noHr ? "—" : `${fmt.bpm(s.max_hr)} bpm`],
-    ["Climb", fmt.metres(s.elev_gain_m)],
+    ["Distance", fmt.km(s.distance_m ?? run.summary_distance), "distance"],
+    ["Moving time", fmt.duration(s.moving_s ?? run.moving_time), "time"],
+    ["Average pace", fmt.pace(s.pace_s_per_km), "pace"],
+    ["Avg heart rate", noHr ? "—" : `${fmt.bpm(s.avg_hr)} bpm`, "hr"],
+    ["Max heart rate", noHr ? "—" : `${fmt.bpm(s.max_hr)} bpm`, "maxhr"],
+    ["Climb", fmt.metres(s.elev_gain_m), "climb"],
   ];
   if (s.elapsed_s && s.moving_s && s.elapsed_s - s.moving_s >= 60)
-    tiles.splice(2, 0, ["Total time", fmt.duration(s.elapsed_s)]);
+    tiles.splice(2, 0, ["Total time", fmt.duration(s.elapsed_s), "time"]);
 
   const header = el("section", { class: "card" },
     el("div", { class: "muted small" }, `${fmt.longDay(run.start_date_local)} · ${fmt.clock(run.start_date_local)}`),
     el("h1", { class: "run-title" }, run.name),
     el("div", { class: "badges" }, tagChip(run), ...runBadges(run)),
-    el("div", { class: "tiles" }, ...tiles.map(([label, value]) =>
-      el("div", { class: "tile" }, el("div", { class: "tile-label" }, label), el("div", { class: "tile-value" }, value)))),
+    el("div", { class: "tiles" }, ...tiles.map(([label, value, kind]) =>
+      el("div", { class: `tile stat-${kind}` }, el("div", { class: "tile-label" }, label), el("div", { class: "tile-value" }, value)))),
     s.elapsed_s - s.moving_s >= 60
       ? el("p", { class: "muted small" }, "Moving time leaves out stops; total time includes them.") : null);
 

@@ -33,6 +33,7 @@
   --accent-soft: #efe8db;
   --link: #1c1a17;
   --tint-1: #e4eefc; --tint-2: #fde7db; --tint-3: #ddf3e7; --tint-4: #ede5fb;
+  --tint-5: #fcf1c7; --tint-6: #fde3ee;
   --strava: #fc4c02;
   --flag: #c2410c;            /* the one "attention" colour */
   --flag-bg: #fdf1ea;
@@ -71,6 +72,7 @@
     --accent-soft: #2a2723;
     --link: #f3efe8;
     --tint-1: #1f3a63; --tint-2: #5a3120; --tint-3: #1a4a37; --tint-4: #3d2d63;
+    --tint-5: #4d4216; --tint-6: #55243a;
     --flag: #f07a3e;
     --flag-bg: #2a1a12;
     --good: #4cc38a;
@@ -246,7 +248,8 @@ span.tag { cursor: default; }
 .back { font-size: 0.88rem; color: var(--muted); text-decoration: none; }
 .back:hover { color: var(--text); }
 .run-title { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.04em; margin: 4px 0 8px; line-height: 1.05; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 20px 24px; margin-top: 22px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 22px; }
+.tile { background: var(--t, var(--wash)); border-radius: 14px; padding: 12px 14px 14px; }
 .tile-label { font-size: 0.78rem; color: var(--muted); }
 .tile-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 
@@ -403,7 +406,8 @@ span.tag { cursor: default; }
 
   .run-title { font-size: 1.9rem; }
   .hello h1 { font-size: 1.9rem; }
-  .tiles { grid-template-columns: repeat(3, 1fr); gap: 16px 12px; }
+  .tiles { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { padding: 10px 11px 12px; }
   .tile-value { font-size: 1.15rem; }
   .map { height: 280px; }
   .split-row { grid-template-columns: 2.2em 1fr 3.6em 2.6em 3.6em; gap: 8px; font-size: 0.88rem; }
@@ -445,3 +449,16 @@ span.tag { cursor: default; }
 @media (hover: hover) { .run-row:hover .run-name a { text-decoration: underline; text-decoration-color: var(--faint); } }
 .hello + .card { border-top: 0; padding-top: 18px; }
 .run-row:active { background: var(--wash); }
+
+/* ---------- each stat has its own colour, everywhere ---------- */
+.stat-distance { --t: var(--tint-1); }
+.stat-time     { --t: var(--tint-2); }
+.stat-pace     { --t: var(--tint-3); }
+.stat-hr       { --t: var(--tint-6); }
+.stat-maxhr    { --t: var(--tint-4); }
+.stat-climb    { --t: var(--tint-5); }
+.pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  background: var(--t, var(--wash)); font-variant-numeric: tabular-nums; font-weight: 550;
+}
+.pill.empty { background: none; color: var(--faint); font-weight: 400; }
