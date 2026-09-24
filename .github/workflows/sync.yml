@@ -36,7 +36,7 @@ jobs:
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
-          PRIVACY_RADIUS_M: "250"
+          PRIVACY_RADIUS_M: "0"      # privacy zone off; e.g. "250" hides 250 m around starts/finishes
         run: python cloud.py sync
 
       - name: Save the locked database (only if something changed)

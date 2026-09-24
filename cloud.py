@@ -33,7 +33,9 @@ STATE_FINGERPRINT = os.path.join(STATE_DIR, "fingerprint")
 SITE_SALT = os.path.join(STATE_DIR, "site-salt")   # not secret; keeps "remember me" working
 SITE_DIR = os.path.join(HERE, "_site")             # built website – not committed
 ITERATIONS = 600_000                               # makes guessing passwords slow
-PRIVACY_RADIUS_M = int(os.environ.get("PRIVACY_RADIUS_M", "250"))
+# Optional privacy zone: hide the route within this many metres of every start/finish.
+# 0 = off (the full route is shown). Set it in .github/workflows/sync.yml to turn it on.
+PRIVACY_RADIUS_M = int(os.environ.get("PRIVACY_RADIUS_M", "0"))
 
 
 # ---------------------------------------------------------------- locking
@@ -181,7 +183,7 @@ def build(pw):
 
     write_json(os.path.join(SITE_DIR, "data", "key.json"), {"salt": b64(salt), "iter": ITERATIONS})
 
-    centres = privacy_centres([r["id"] for r in runs if r["streams_status"] == "done"])
+    centres = privacy_centres([r["id"] for r in runs if r["streams_status"] == "done"]) if PRIVACY_RADIUS_M > 0 else []
     files = {}
     for r in runs:
         if r["streams_status"] != "done":
@@ -189,7 +191,8 @@ def build(pw):
         activity, streams = db.get_activity(r["id"]), db.get_streams(r["id"])
         detail = analysis.detail(activity, streams)
         compare = analysis.compare_series(activity, streams)
-        apply_privacy(detail, compare, centres)
+        if centres:
+            apply_privacy(detail, compare, centres)
         # File names are scrambled so they don't reveal your Strava activity ids
         name = hmac.new(key, str(r["id"]).encode(), hashlib.sha256).hexdigest()[:24]
         files[r["id"]] = name
@@ -201,8 +204,9 @@ def build(pw):
                  athlete_name=auth.get("athlete_name"),
                  max_hr=db.get_meta("max_hr", webapp.DEFAULT_MAX_HR))
     write_json(os.path.join(SITE_DIR, "data", "index.json"), lock(key, json.dumps(index).encode()))
-    print(f"Built the website in _site/ with {len(runs)} runs "
-          f"(routes hidden within {PRIVACY_RADIUS_M} m of {len(centres)} start/finish points).")
+    zone = (f"routes hidden within {PRIVACY_RADIUS_M} m of {len(centres)} start/finish points"
+            if centres else "full routes shown")
+    print(f"Built the website in _site/ with {len(runs)} runs ({zone}).")
 
 
 # ---------------------------------------------------------------- commands

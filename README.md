@@ -11,7 +11,7 @@ It comes in two versions that share the same code:
 | Syncing | When you open it / press *Sync now* | Automatically every morning, or press **Update** |
 | Login | Not needed – only your Mac can open it | Password screen |
 | Tags | Add and edit | Read-only |
-| Route near home | Shown | Hidden (250 m privacy zone) |
+| Route | Full route | Full route |
 
 **Built with:** Python + Flask (a small, popular web server), SQLite (a database that's a single
 file), and plain HTML/JavaScript with the Leaflet map library. No build tools needed.
@@ -90,8 +90,10 @@ The backup contains your Strava login, so keep it somewhere private.
   about 2 minutes, then reload the site. (It can't start the update directly, because that would
   mean putting a GitHub password inside the website.)
 - **GitHub Pages sites are public**, so everything is **locked with your password** (AES-256
-  encryption, done in your browser). Without the password, the files are unreadable. The route
-  within **250 m** of every start and finish is also removed, so your home is never on the map.
+  encryption, done in your browser). Without the password, the files are unreadable – including
+  your routes, which start from home, so keep the password long and private.
+- Optional **privacy zone**: to hide the route near every start and finish, change
+  `PRIVACY_RADIUS_M: "0"` in `.github/workflows/sync.yml` to e.g. `"250"` (metres). It's off by default.
 - Your Strava keys and password live in GitHub's **secrets** store, never in the code.
 
 ### One-time setup
