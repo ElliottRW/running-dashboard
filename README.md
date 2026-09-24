@@ -1,4 +1,4 @@
-# My Runs – personal Strava running dashboard
+# Stride – personal Strava running dashboard
 
 Your Strava runs, worked out properly from the GPS track: personal bests, weekly totals, km
 splits, route maps, plain-English notes on each run, and a side-by-side compare page.
