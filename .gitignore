@@ -1,0 +1,18 @@
+# Secrets — never commit these
+.env
+
+# Your running data and Strava login tokens live here
+data/
+
+# Python bits
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local tool settings
+.claude/
+
+# Website build output (GitHub builds this itself)
+_site/
+sync_problem.txt

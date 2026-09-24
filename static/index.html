@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>My Runs</title>
+  <!-- Relative paths, so this works both on your Mac and on the GitHub Pages website -->
+  <link rel="stylesheet" href="static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav" aria-label="Pages">
+      <a class="brand" href="#/">My Runs</a>
+      <a class="nav-link" href="#/" data-page="overview">Overview</a>
+      <a class="nav-link" href="#/runs" data-page="list">Runs</a>
+      <a class="nav-link" href="#/compare/" data-page="compare">Compare</a>
+    </nav>
+    <div class="sync-area">
+      <span id="last-sync" class="muted small"></span>
+      <button id="sync-btn" class="btn" hidden>Sync now</button>
+      <a id="update-btn" class="btn" hidden target="_blank" rel="noopener">Update</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Website only: password screen -->
+    <section id="card-lock" class="card lock" hidden>
+      <h2>This dashboard is private</h2>
+      <p class="muted small">Enter the password to unlock it. It's checked on this device only.</p>
+      <form id="lock-form">
+        <label class="field">Password
+          <input id="lock-password" type="password" autocomplete="current-password" required>
+        </label>
+        <label class="check"><input id="lock-remember" type="checkbox"> Remember on this device</label>
+        <button class="btn" type="submit">Unlock</button>
+        <p id="lock-msg" class="small error-text" role="alert"></p>
+      </form>
+    </section>
+
+    <!-- Shown when .env isn't filled in yet -->
+    <section id="card-config" class="card warn" hidden>
+      <h2>One step left: add your Strava keys</h2>
+      <p>The app can't find your Strava <strong>Client ID</strong> and <strong>Client Secret</strong>.
+        Put them in the <code>.env</code> file in the project folder (see the README), then stop and
+        restart the app.</p>
+    </section>
+
+    <!-- Shown when not logged in to Strava -->
+    <section id="card-connect" class="card" hidden>
+      <h2>Connect your Strava account</h2>
+      <p>You'll be sent to Strava to allow this dashboard to read your activities, then brought
+        back here. You only need to do this once.</p>
+      <p class="muted small">On Strava's page, leave <em>“View data about your private activities”</em>
+        ticked so private runs are included too.</p>
+      <a class="btn strava" href="/auth/login">Connect to Strava</a>
+    </section>
+
+    <!-- Messages: errors, warnings, "connected!" -->
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <!-- Sync progress -->
+    <section id="card-sync" class="card" hidden>
+      <div class="sync-row">
+        <strong id="sync-title">Syncing…</strong>
+        <span id="sync-count" class="muted small"></span>
+      </div>
+      <div class="progress" aria-hidden="true"><div id="sync-bar"></div></div>
+      <p id="sync-msg" class="small"></p>
+      <p id="sync-usage" class="muted small"></p>
+    </section>
+
+    <!-- ============ Overview ============ -->
+    <div id="page-overview" hidden>
+      <section id="pbs" class="card" hidden>
+        <h2>Personal bests</h2>
+        <p class="muted small">Your fastest 1 km, 5 km and 10 km <em>anywhere inside</em> a run, not just from
+          the start. Worked out from your GPS track; treadmill runs aren't counted because their distance is
+          only estimated.</p>
+        <div id="pb-grid" class="pb-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>Last 7 days</h2>
+        <div id="effort-items" class="effort-list"></div>
+      </section>
+
+      <section id="weeks" class="card">
+        <div class="list-head">
+          <h2>Weekly totals</h2>
+          <div class="segmented" role="group" aria-label="Show">
+            <button type="button" class="seg-btn" data-m="distance">Distance</button>
+            <button type="button" class="seg-btn" data-m="runs">Runs</button>
+            <button type="button" class="seg-btn" data-m="time">Time</button>
+          </div>
+        </div>
+        <p class="muted small"><span id="week-unit"></span> The last 8 weeks, Monday to Sunday; the striped bar is this week so far.</p>
+        <div id="week-cols" class="week-cols"></div>
+        <details class="table-toggle">
+          <summary class="small">Show as a table</summary>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Week</th><th class="num">Distance</th><th class="num">Runs</th><th class="num">Time</th></tr></thead>
+              <tbody id="week-rows"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Settings</h2>
+        <form id="settings-form" class="settings">
+          <label class="field">Your maximum heart rate
+            <span class="inline"><input id="max-hr" type="number" min="120" max="230" inputmode="numeric" required> bpm</span>
+          </label>
+          <button class="btn" type="submit">Save</button>
+        </form>
+        <p class="muted small">Used to decide which runs were “hard”. If you don't know yours, 185 is a reasonable
+          starting point. The often-quoted “220 minus your age” is only a rough guess – real maximums vary a lot
+          from person to person. <span id="max-hr-where"></span></p>
+        <p id="max-hr-hint" class="small"></p>
+        <p id="settings-msg" class="small" role="status"></p>
+      </section>
+    </div>
+
+    <!-- ============ Run list ============ -->
+    <div id="page-list" hidden>
+      <section id="runs" class="card" hidden>
+        <div class="list-head">
+          <h2>Runs <span id="run-count" class="muted small"></span></h2>
+          <label class="small filter">Show
+            <select id="tag-filter"><option value="">all runs</option></select>
+          </label>
+        </div>
+        <p class="muted small">Pace is minutes per km, using time spent moving (stops at traffic lights
+          don't count). <span id="tag-hint">Tap a tag to add your own label.</span></p>
+        <div class="table-wrap">
+          <table class="runs-table">
+            <thead><tr>
+              <th>Date</th><th>Run</th><th class="num">Distance</th><th class="num">Time</th>
+              <th class="num">Pace</th><th class="num" title="Average heart rate, beats per minute">Avg HR</th>
+              <th class="num" title="Highest heart rate, beats per minute">Max HR</th>
+              <th class="num" title="Total uphill climbing">Climb</th>
+            </tr></thead>
+            <tbody id="run-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Single run (filled in by run.js) -->
+    <div id="page-run" hidden></div>
+
+    <!-- Compare runs (filled in by compare.js) -->
+    <div id="page-compare" hidden></div>
+    <datalist id="tag-options"></datalist>
+
+    <p id="athlete" class="muted small footer-note"></p>
+  </main>
+
+  <script src="static/config.js"></script>
+  <script src="static/vendor/leaflet/leaflet.js"></script>
+  <script src="static/format.js"></script>
+  <script src="static/data.js"></script>
+  <script src="static/run.js"></script>
+  <script src="static/compare.js"></script>
+  <script src="static/runs.js"></script>
+  <script src="static/overview.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>

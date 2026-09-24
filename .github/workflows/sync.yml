@@ -1,0 +1,75 @@
+# Runs every day (and whenever you press "Run workflow" on GitHub):
+# fetches new runs from Strava, rebuilds the password-locked website, and publishes it.
+name: Sync runs
+
+on:
+  schedule:
+    - cron: "15 5 * * *"      # every day at 05:15 UTC (06:15 in UK summer time)
+  workflow_dispatch:          # the "Run workflow" button – this is your Update button
+
+permissions:
+  contents: write             # to save the locked database back into the repo
+  pages: write                # to publish the website
+  id-token: write
+
+concurrency:
+  group: sync                 # never run two syncs at once
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120      # long enough to wait out Strava's 15-minute limit a few times
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Sync from Strava and build the website
+        env:
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+          PRIVACY_RADIUS_M: "250"
+        run: python cloud.py sync
+
+      - name: Save the locked database (only if something changed)
+        run: |
+          git config user.name "running-dashboard bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state
+          if git diff --cached --quiet; then
+            echo "Nothing new to save."
+          else
+            git commit -m "Update running data"
+            git pull --rebase
+            git push
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Tell me if Strava needs reconnecting
+        run: |
+          if [ -f sync_problem.txt ]; then
+            echo "::error::$(cat sync_problem.txt)"
+            exit 1
+          fi
+
+  deploy:
+    needs: sync
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
