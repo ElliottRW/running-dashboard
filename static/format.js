@@ -41,6 +41,50 @@ const fmt = {
   },
 };
 
+// ---------- sports other than running ----------
+
+// Strava sport_type → how we show it. Anything not listed gets its name split into words.
+const SPORTS = {
+  Walk: ["🚶", "Walk"], Hike: ["🥾", "Hike"],
+  Ride: ["🚴", "Ride"], VirtualRide: ["🚴", "Indoor ride"], EBikeRide: ["🚴", "E-bike ride"],
+  EMountainBikeRide: ["🚵", "E-mountain bike ride"], GravelRide: ["🚴", "Gravel ride"], MountainBikeRide: ["🚵", "Mountain bike ride"],
+  VirtualRun: ["🏃", "Virtual run"],
+  Swim: ["🏊", "Swim"], Rowing: ["🚣", "Rowing"], VirtualRow: ["🚣", "Indoor rowing"], Kayaking: ["🛶", "Kayaking"],
+  WeightTraining: ["🏋️", "Weights"], Workout: ["💪", "Workout"], Crossfit: ["💪", "CrossFit"], HighIntensityIntervalTraining: ["💪", "HIIT"],
+  Yoga: ["🧘", "Yoga"], Pilates: ["🧘", "Pilates"], Elliptical: ["⚙️", "Elliptical"], StairStepper: ["🪜", "Stair stepper"],
+  AlpineSki: ["⛷️", "Skiing"], NordicSki: ["⛷️", "Cross-country skiing"], Snowboard: ["🏂", "Snowboarding"],
+  RockClimbing: ["🧗", "Climbing"], Tennis: ["🎾", "Tennis"], Soccer: ["⚽", "Football"], Golf: ["⛳", "Golf"],
+};
+const RIDES = new Set(["Ride", "VirtualRide", "EBikeRide", "EMountainBikeRide", "GravelRide", "MountainBikeRide", "Handcycle", "Velomobile"]);
+
+const sport = {
+  icon: (type) => (SPORTS[type] || ["🏅"])[0],
+  name: (type) => (SPORTS[type] || [null, (type || "Activity").replace(/([a-z])([A-Z])/g, "$1 $2")])[1],
+  // "Walks", "Mountain bike rides" – for filters
+  plural(type, n = 2) {
+    const name = sport.name(type);
+    if (n === 1) return name;
+    return sport.countable(type) ? `${name}s` : name;
+  },
+  countable: (type) => /(Walk|Hike|ride|Ride|Swim|run|Workout)$/.test(sport.name(type)),
+  // "1 walk", "3 rides", "2 yoga sessions"
+  count(type, n) {
+    const name = sport.name(type).toLowerCase();
+    const noun = sport.countable(type) ? name : `${name} session`;
+    return `${n} ${noun}${n === 1 ? "" : "s"}`;
+  },
+  isRide: (type) => RIDES.has(type),
+  isSwim: (type) => type === "Swim",
+  // How fast, the way people usually say it: km/h on a bike, per 100 m in the pool, per km on foot
+  speed(secsPerKm, type, unit = true) {
+    if (!secsPerKm || !isFinite(secsPerKm)) return "—";
+    if (sport.isRide(type)) return `${(3600 / secsPerKm).toFixed(1)}${unit ? " km/h" : ""}`;
+    if (sport.isSwim(type)) return `${fmt.pace(secsPerKm / 10, false)}${unit ? " /100 m" : ""}`;
+    return fmt.pace(secsPerKm, unit);
+  },
+  speedLabel: (type) => (sport.isRide(type) ? "Average speed" : "Average pace"),
+};
+
 // Build an element safely: text from Strava (run names, tags) is never treated as HTML.
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);

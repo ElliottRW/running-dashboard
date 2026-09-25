@@ -6,9 +6,13 @@ the watch's distance recording, then to Strava's summary distance.
 import math
 
 STATS_VERSION = 2           # bump when the maths changes, so stats get recalculated
+RUN_TYPES = {"Run", "TrailRun"}  # everything else (walks, rides…) is an "other activity"
+RIDE_TYPES = {"Ride", "VirtualRide", "EBikeRide", "EMountainBikeRide", "GravelRide", "MountainBikeRide",
+              "Handcycle", "Velomobile"}
 PB_DISTANCES = {"1k": 1000, "5k": 5000, "10k": 10000}
 MOVING_SPEED = 0.6          # m/s – slower than this counts as stopped (traffic lights etc.)
 GLITCH_SPEED = 12.0         # m/s – faster than Usain Bolt means a GPS jump, not you
+RIDE_GLITCH_SPEED = 30.0    # m/s – bikes really can go 43 km/h+ downhill
 
 
 def haversine(a, b):
@@ -30,11 +34,15 @@ def smooth(values, half_window):
     return out
 
 
-def gps_distance(time, latlng):
+def is_run(activity):
+    return (activity or {}).get("sport_type") in RUN_TYPES
+
+
+def gps_distance(time, latlng, glitch_speed=GLITCH_SPEED):
     """Cumulative distance along the GPS track.
 
     No smoothing here: smoothing the position cuts corners and loses ~2%.
-    Obvious GPS jumps (faster than GLITCH_SPEED) are skipped instead.
+    Obvious GPS jumps (faster than glitch_speed) are skipped instead.
     """
     dist = [0.0]
     for i in range(1, len(latlng)):
@@ -42,17 +50,18 @@ def gps_distance(time, latlng):
         step = 0.0
         if a and b:
             step = haversine(a, b)
-            if step / max(time[i] - time[i - 1], 1) > GLITCH_SPEED:
+            if step / max(time[i] - time[i - 1], 1) > glitch_speed:
                 step = 0.0
         dist.append(dist[-1] + step)
     return dist
 
 
-def cumulative_distance(streams):
+def cumulative_distance(streams, activity=None):
     """Returns (distance list or None, source) – see module docstring."""
     time = streams.get("time") or []
     if streams.get("latlng") and len(streams["latlng"]) == len(time):
-        return gps_distance(time, streams["latlng"]), "gps"
+        ride = (activity or {}).get("sport_type") in RIDE_TYPES
+        return gps_distance(time, streams["latlng"], RIDE_GLITCH_SPEED if ride else GLITCH_SPEED), "gps"
     if streams.get("distance") and len(streams["distance"]) == len(time):
         return list(streams["distance"]), "watch"
     return None, "summary"
@@ -104,7 +113,7 @@ def elevation_gain(altitude, threshold=1.0):
 def compute(activity, streams):
     """All the per-run numbers the dashboard shows. `activity` is a DB row dict."""
     time = streams.get("time") or []
-    dist, source = cumulative_distance(streams)
+    dist, source = cumulative_distance(streams, activity)
 
     if dist:
         distance = dist[-1]
@@ -132,7 +141,7 @@ def compute(activity, streams):
         max_hr = max(h for h in hr if h) if any(hr) else None
 
     efforts = {}
-    if source == "gps":   # treadmill distances are estimates – not fair for PBs
+    if source == "gps" and is_run(activity):   # treadmill distances are estimates – not fair for PBs
         for key, metres in PB_DISTANCES.items():
             efforts[key] = best_effort(time, dist, metres)
 
@@ -178,6 +187,7 @@ from bisect import bisect_left
 
 PACE_WINDOW_S = 30          # smooth pace over ~30 seconds
 SLOWEST_PACE_SPEED = 1.0    # m/s – slower than ~16:40 /km is a stop/walk: gap in the pace line
+SLOWEST_OTHER_SPEED = 0.5   # m/s – walks and hikes go slower, so only true stops leave a gap
 CHART_POINTS = 800          # plenty for a smooth line, light enough for a phone
 
 
@@ -368,7 +378,9 @@ def fmt_pace(secs_per_km):
 def detail(activity, streams):
     """Everything the single-run page needs, already crunched."""
     time = streams.get("time") or []
-    dist, source = cumulative_distance(streams)
+    dist, source = cumulative_distance(streams, activity)
+    run = is_run(activity)
+    slowest = SLOWEST_PACE_SPEED if run else SLOWEST_OTHER_SPEED
     hr = streams.get("heartrate") if streams.get("heartrate") and len(streams["heartrate"]) == len(time) else None
     alt_raw = streams.get("altitude") if streams.get("altitude") and len(streams["altitude"]) == len(time) else None
     alt = smooth(alt_raw, 3) if alt_raw else None
@@ -388,12 +400,13 @@ def detail(activity, streams):
             "x_km": [round(dist[i] / 1000, 4) for i in idx],
             "t": [time[i] for i in idx],
             "elevation": [round(alt[i], 1) if alt and alt[i] is not None else None for i in idx] if alt else None,
-            "pace": [round(1000 / speed[i], 1) if speed[i] and speed[i] >= SLOWEST_PACE_SPEED else None for i in idx],
+            "pace": [round(1000 / speed[i], 1) if speed[i] and speed[i] >= slowest else None for i in idx],
             "hr": [hr[i] for i in idx] if hr else None,
             "latlng": [latlng[i] for i in idx] if latlng else None,
         }
         out["splits"] = splits(time, dist, mtime, alt, hr)
-        out["summary"] = summarise(time, dist, mtime, alt, hr)
+        # The pacing notes are written for runs; other activities just get the numbers
+        out["summary"] = summarise(time, dist, mtime, alt, hr) if run else []
     else:
         # No distance recording at all (e.g. some treadmill runs): heart rate by time only
         out["series"] = {"x_min": [round(time[i] / 60, 2) for i in idx],
@@ -401,7 +414,7 @@ def detail(activity, streams):
         out["splits"] = []
         out["summary"] = [{"topic": "pacing", "text":
                            "This run has no distance recording (common on a treadmill), so there are no "
-                           "km splits or pacing notes – but your heart rate is shown below."}]
+                           "km splits or pacing notes – but your heart rate is shown below."}] if run else []
 
     if latlng:
         pts = [p for p in latlng if p]
@@ -425,7 +438,7 @@ GRID_M = 10          # compare runs every 10 metres
 def compare_series(activity, streams):
     """One run resampled every 10 m, so different runs can be lined up by distance."""
     time = streams.get("time") or []
-    dist, source = cumulative_distance(streams)
+    dist, source = cumulative_distance(streams, activity)
     if not dist or dist[-1] < 100:
         return None
     n = len(time)

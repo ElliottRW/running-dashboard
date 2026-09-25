@@ -14,6 +14,16 @@ async function renderOverview() {
   renderWeeks(runs);
   renderEffort(runs, maxHr);
   renderSettings(runs, maxHr);
+  renderOtherRecent(data.activities || []);
+}
+
+// ---------------------------------------------------------------- walks, rides… (kept apart from running)
+
+function renderOtherRecent(acts) {
+  const since = startOfDay(new Date()); since.setDate(since.getDate() - 27);
+  const tiles = sportTotals(acts.filter((a) => runDate(a) >= since));
+  $("other-recent").hidden = !tiles.length;
+  $("other-recent-items").replaceChildren(...tiles);
 }
 
 // ---------------------------------------------------------------- greeting

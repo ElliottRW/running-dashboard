@@ -1,6 +1,6 @@
 """Everything to do with the local SQLite database (data/running.db).
 
-The database holds your runs, their detailed streams, your Strava login
+The database holds your activities (runs, walks, rides…), their detailed streams, your Strava login
 tokens and a few settings. It lives only on your computer.
 """
 import json
@@ -214,10 +214,10 @@ def mark_streams_missing(activity_id, note):
 def counts():
     with connect() as conn:
         row = conn.execute(
-            "SELECT COUNT(*) AS runs, "
+            "SELECT COUNT(*) AS activities, "
             "SUM(streams_status = 'pending') AS pending, "
             "SUM(streams_status = 'missing') AS missing FROM activities").fetchone()
-    return {"runs": row["runs"] or 0, "pending": row["pending"] or 0,
+    return {"activities": row["activities"] or 0, "pending": row["pending"] or 0,
             "missing": row["missing"] or 0}
 
 
@@ -231,7 +231,7 @@ def list_runs_basic(limit=500):
 
 
 def delete_activity(activity_id):
-    """Forget a run that's been deleted on Strava (or is no longer a run)."""
+    """Forget an activity that's been deleted on Strava."""
     with _lock, connect() as conn:
         for table, col in (("run_stats", "activity_id"), ("streams", "activity_id"), ("activities", "id")):
             conn.execute(f"DELETE FROM {table} WHERE {col} = ?", (activity_id,))

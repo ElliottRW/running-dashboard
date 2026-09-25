@@ -168,13 +168,19 @@ def personal_bests(runs):
 
 
 def runs_payload():
-    """Every run with its stats, plus PBs – shared by the Mac app and the website build."""
+    """Every run with its stats, plus PBs – shared by the Mac app and the website build.
+
+    Walks, rides and everything else come separately as `activities`, so they never
+    count towards your running totals or bests."""
     ensure_stats()
-    runs = db.list_runs_with_stats()
+    everything = db.list_runs_with_stats()
+    runs = [a for a in everything if analysis.is_run(a)]
+    activities = [a for a in everything if not analysis.is_run(a)]
     dupes = analysis.find_duplicates(runs)
-    for r in runs:
+    dupes.update(analysis.find_duplicates(activities))
+    for r in everything:
         r["duplicate_of"] = dupes.get(r["id"])
-    return dict(runs=runs, pbs=personal_bests(runs), tags=db.all_tags(),
+    return dict(runs=runs, activities=activities, pbs=personal_bests(runs), tags=db.all_tags(),
                 new_ids=db.get_meta("last_sync_new_ids", []))
 
 

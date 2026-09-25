@@ -87,12 +87,12 @@ const DATA = (() => {
       if (!IS_STATIC) return getJSON("/api/status");
       return { static: true, configured: true, connected: true, scope_ok: true,
         last_sync: index.last_sync, athlete_name: index.athlete_name, sync: { running: false, phase: "idle" },
-        counts: { runs: index.runs.length, pending: 0 } };
+        counts: { activities: index.runs.length + (index.activities || []).length, pending: 0 } };
     },
 
     async runs() {
       if (!IS_STATIC) return getJSON("/api/runs");
-      return { runs: index.runs, pbs: index.pbs, tags: index.tags, new_ids: index.new_ids };
+      return { runs: index.runs, activities: index.activities || [], pbs: index.pbs, tags: index.tags, new_ids: index.new_ids };
     },
 
     async run(id) {
@@ -100,7 +100,7 @@ const DATA = (() => {
         const res = await fetch(`/api/runs/${id}`);
         return res.ok ? res.json() : null;
       }
-      const run = index.runs.find((r) => r.id === id);
+      const run = index.runs.find((r) => r.id === id) || (index.activities || []).find((r) => r.id === id);
       if (!run) return null;
       const f = await runFile(id);
       return { run, detail: (f && f.detail) || {} };

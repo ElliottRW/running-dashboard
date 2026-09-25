@@ -17,6 +17,7 @@
       <a class="brand" href="#/">Stride</a>
       <a class="nav-link" href="#/" data-page="overview">Overview</a>
       <a class="nav-link" href="#/runs" data-page="list">Runs</a>
+      <a class="nav-link" href="#/activities" data-page="activities">Other</a>
       <a class="nav-link" href="#/compare/" data-page="compare">Compare</a>
     </nav>
     <div class="sync-area">
@@ -115,6 +116,15 @@
       </section>
       </div>
 
+      <section id="other-recent" class="card" hidden>
+        <div class="list-head">
+          <h2>Beyond running</h2>
+          <a class="small" href="#/activities">See them all →</a>
+        </div>
+        <p class="muted small">Your walks, rides and everything else over the last 4 weeks. These don't count towards your running totals.</p>
+        <div id="other-recent-items" class="sport-totals"></div>
+      </section>
+
       <section class="card">
         <h2>Settings</h2>
         <form id="settings-form" class="settings">
@@ -154,7 +164,33 @@
       </section>
     </div>
 
-    <!-- Single run (filled in by run.js) -->
+    <!-- ============ Other activities ============ -->
+    <div id="page-activities" hidden>
+      <section class="card">
+        <div class="list-head">
+          <h2>Other activities <span id="activity-count" class="muted small"></span></h2>
+          <label class="small filter">Show
+            <select id="sport-filter"><option value="">everything</option></select>
+          </label>
+        </div>
+        <p class="muted small">Walks, rides, workouts and anything else you've recorded on Strava. They're kept apart from your runs, so they don't change your running totals or bests.</p>
+        <div id="activity-totals" class="sport-totals"></div>
+        <p id="activities-empty" class="muted" hidden>Nothing here yet. Anything that isn't a run – walks, rides, gym sessions – will show up after the next sync.</p>
+        <div class="table-wrap">
+          <table class="runs-table">
+            <thead><tr>
+              <th>Date</th><th>Activity</th><th class="num">Distance</th><th class="num">Time</th>
+              <th class="num">Pace / speed</th><th class="num" title="Average heart rate, beats per minute">Avg HR</th>
+              <th class="num" title="Highest heart rate, beats per minute">Max HR</th>
+              <th class="num" title="Total uphill climbing">Climb</th>
+            </tr></thead>
+            <tbody id="activity-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Single run or activity (filled in by run.js) -->
     <div id="page-run" hidden></div>
 
     <!-- Compare runs (filled in by compare.js) -->
@@ -171,6 +207,7 @@
   <script src="static/run.js"></script>
   <script src="static/compare.js"></script>
   <script src="static/runs.js"></script>
+  <script src="static/activities.js"></script>
   <script src="static/overview.js"></script>
   <script src="static/app.js"></script>
 </body>

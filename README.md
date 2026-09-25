@@ -2,6 +2,8 @@
 
 Your Strava runs, worked out properly from the GPS track: personal bests, weekly totals, km
 splits, route maps, plain-English notes on each run, and a side-by-side compare page.
+Walks, rides, gym sessions and everything else you record are on the **Other** page – kept
+apart from your runs, so they never change your running totals or bests.
 
 It comes in two versions that share the same code:
 
@@ -178,6 +180,11 @@ The good option is for each friend to have **their own copy**:
 - **This week's check-in** covers Monday to today. **Hard runs**: average heart rate above 85% of the
   max heart rate set on the Overview page (flagged if more than 2; last week's count is shown alongside). **Longest run** is compared with
   the longest in the 3 full weeks before (flagged if more than 10% further).
+- **Other activities** (walks, rides, workouts…) get the same distance, time, heart rate, map and
+  km splits, but no pacing notes. Rides show speed in km/h. They're never counted in running
+  totals, the check-in or PBs. The first sync after they were added goes back through your whole
+  Strava history once to fetch older ones; on the website that can take a few daily updates, as
+  each one stops after about 95 minutes and carries on next time.
 - **Duplicates** (same start within 2 minutes, distance within 5%) are shown greyed out and left
   out of totals and PBs.
 
@@ -187,7 +194,7 @@ The good option is for each friend to have **their own copy**:
 |---|---|
 | `app.py` | The Mac web server and Strava login |
 | `strava.py` | Talking to Strava politely (token refresh, rate limits) |
-| `sync.py` | Fetching runs and their detail, resuming where it stopped |
+| `sync.py` | Fetching activities and their detail, resuming where it stopped |
 | `db.py` | The SQLite database |
 | `analysis.py` | All the maths: distance, splits, PBs, notes, compare data |
 | `cloud.py` | The website: locking, privacy zones, building, daily sync |

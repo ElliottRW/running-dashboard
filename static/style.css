@@ -232,6 +232,12 @@ td.date { white-space: nowrap; }
 .run-name a { color: var(--text); text-decoration: none; }
 .run-name a:hover { text-decoration: underline; text-decoration-color: var(--faint); }
 tr.is-dup { opacity: .5; }
+.sport-icon { font-size: 1.05rem; line-height: 1; }
+.sport-badge { color: var(--text); }
+.sport-totals { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.sport-totals:empty { display: none; }
+.sport-total { background: var(--wash); border-radius: 12px; padding: 10px 12px; }
+.sport-total-head { font-weight: 600; }
 .new-run { font-size: 0.66rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--volt); color: var(--on-volt); }
 .tag {
   font: inherit; font-size: 0.72rem; font-weight: 500; padding: 1px 8px; border-radius: 999px; cursor: pointer;

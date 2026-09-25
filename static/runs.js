@@ -5,7 +5,8 @@ let runsData = null;
 
 async function renderRuns() {
   runsData = await DATA.runs();
-  renderTagOptions(runsData.tags);
+  // The filter only offers tags you've used on runs; suggestions include every tag
+  renderTagOptions(runsData.tags, [...new Set(runsData.runs.map((r) => r.tag).filter(Boolean))].sort());
   renderRunList();
 }
 
@@ -58,13 +59,13 @@ function pbCard(label, value, sub, best, pb, improvement, where) {
 
 // ---------- run list ----------
 
-function renderTagOptions(tags) {
+function renderTagOptions(tags, runTags = tags) {
   const all = [...new Set([...tags, ...DEFAULT_TAGS])];
   $("tag-options").replaceChildren(...all.map((t) => el("option", { value: t })));
   const sel = $("tag-filter");
   const current = sel.value;
   sel.replaceChildren(el("option", { value: "" }, "all runs"),
-    ...tags.map((t) => el("option", { value: t }, `tagged “${t}”`)),
+    ...runTags.map((t) => el("option", { value: t }, `tagged “${t}”`)),
     el("option", { value: "__untagged" }, "untagged"));
   sel.value = [...sel.options].some((o) => o.value === current) ? current : "";
 }
@@ -76,10 +77,14 @@ function runBadges(r) {
   if (r.private) b.push(["Private", "Only visible to you on Strava"]);
   if (r.streams_status === "pending") b.push(["Details downloading…"]);
   if (r.streams_status === "missing") b.push(["No detailed data", r.streams_note]);
-  if (r.streams_status === "done" && !r.has_gps) b.push([r.trainer ? "Treadmill – no GPS" : "No GPS", r.streams_note || "No map or GPS-based stats for this run."]);
-  if (r.streams_status === "done" && !r.has_hr) b.push(["No heart rate", "Your watch didn't record heart rate on this run."]);
+  // A gym session or yoga class never has GPS – only mention it when there was some distance
+  const onTheMove = isRunType(r) || (r.summary_distance || 0) > 0;
+  if (r.streams_status === "done" && !r.has_gps && onTheMove) b.push([r.trainer ? (isRunType(r) ? "Treadmill – no GPS" : "Indoor – no GPS") : "No GPS", r.streams_note || "No map or GPS-based stats for this one."]);
+  if (r.streams_status === "done" && !r.has_hr) b.push(["No heart rate", "Your watch didn't record heart rate on this one."]);
   return b.map(([text, title]) => el("span", { class: "badge", title }, text));
 }
+
+const isRunType = (r) => r.sport_type === "Run" || r.sport_type === "TrailRun";
 
 function renderRunList() {
   const { runs } = runsData;

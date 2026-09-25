@@ -194,9 +194,11 @@ def build(pw):
 
     write_json(os.path.join(SITE_DIR, "data", "key.json"), {"salt": b64(salt), "iter": ITERATIONS})
 
-    centres = privacy_centres([r["id"] for r in runs if r["streams_status"] == "done"]) if PRIVACY_RADIUS_M > 0 else []
+    # Walks and rides start from home too, so their ends count towards the privacy zone
+    centres = privacy_centres([r["id"] for r in runs + payload["activities"]
+                               if r["streams_status"] == "done"]) if PRIVACY_RADIUS_M > 0 else []
     files = {}
-    for r in runs:
+    for r in runs + payload["activities"]:
         if r["streams_status"] != "done":
             continue
         activity, streams = db.get_activity(r["id"]), db.get_streams(r["id"])
@@ -217,7 +219,8 @@ def build(pw):
     write_json(os.path.join(SITE_DIR, "data", "index.json"), lock(key, json.dumps(index).encode()))
     zone = (f"routes hidden within {PRIVACY_RADIUS_M} m of {len(centres)} start/finish points"
             if centres else "full routes shown")
-    print(f"Built the website in _site/ with {len(runs)} runs ({zone}).")
+    print(f"Built the website in _site/ with {len(runs)} runs and "
+          f"{len(payload['activities'])} other activities ({zone}).")
 
 
 # ---------------------------------------------------------------- commands
@@ -228,6 +231,7 @@ def cmd_sync():
     unlock_state(pw)
     db.init()
     manager = webapp.sync_manager
+    manager.time_budget_s = 95 * 60   # the workflow is stopped at 120 min – finish and save well before
     manager.start()
     manager._thread.join()
     state = manager.snapshot()

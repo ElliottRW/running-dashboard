@@ -1,4 +1,5 @@
 // The single-run page: headline numbers, plain-English summary, map, splits and profile chart.
+// Walks, rides and other activities use it too – without the running-only bits.
 
 let runMap = null;          // Leaflet map for the current run (removed when leaving the page)
 let hoverMarker = null;     // dot on the map that follows the chart
@@ -18,26 +19,32 @@ async function renderRunPage(id) {
   currentRun = { run, detail };
   const s = run.stats || {};
   const noHr = run.streams_status === "done" && !run.has_hr;
+  const isRun = isRunType(run);
+  if (!isRun) setNav("activities");
+  const metres = s.distance_m ?? run.summary_distance;
+  const moved = isRun || metres >= 100;   // false for gym sessions, yoga…
 
   // ----- header -----
   const tiles = [
-    ["Distance", fmt.km(s.distance_m ?? run.summary_distance), "distance"],
-    ["Moving time", fmt.duration(s.moving_s ?? run.moving_time), "time"],
-    ["Average pace", fmt.pace(s.pace_s_per_km), "pace"],
-    ["Avg heart rate", noHr ? "—" : `${fmt.bpm(s.avg_hr)} bpm`, "hr"],
-    ["Max heart rate", noHr ? "—" : `${fmt.bpm(s.max_hr)} bpm`, "maxhr"],
-    ["Climb", fmt.metres(s.elev_gain_m), "climb"],
-  ];
-  if (s.elapsed_s && s.moving_s && s.elapsed_s - s.moving_s >= 60)
+    moved ? ["Distance", fmt.km(metres), "distance"] : null,
+    ["Moving time", fmt.duration((moved ? s.moving_s : s.elapsed_s) || run.moving_time), "time"],
+    moved ? [sport.speedLabel(run.sport_type), sport.speed(s.pace_s_per_km, run.sport_type), "pace"] : null,
+    ["Avg heart rate", noHr ? "—" : `${fmt.bpm(s.avg_hr ?? run.average_heartrate)} bpm`, "hr"],
+    ["Max heart rate", noHr ? "—" : `${fmt.bpm(s.max_hr ?? run.max_heartrate)} bpm`, "maxhr"],
+    moved ? ["Climb", fmt.metres(s.elev_gain_m), "climb"] : null,
+  ].filter(Boolean);
+  if (!moved) tiles[0][0] = "Time";
+  if (moved && s.elapsed_s && s.moving_s && s.elapsed_s - s.moving_s >= 60)
     tiles.splice(2, 0, ["Total time", fmt.duration(s.elapsed_s), "time"]);
 
   const header = el("section", { class: "card" },
     el("div", { class: "muted small" }, `${fmt.longDay(run.start_date_local)} · ${fmt.clock(run.start_date_local)}`),
-    el("h1", { class: "run-title" }, run.name),
-    el("div", { class: "badges" }, tagChip(run), ...runBadges(run)),
+    el("h1", { class: "run-title" }, isRun ? null : el("span", { class: "sport-icon", "aria-hidden": "true" }, `${sport.icon(run.sport_type)} `), run.name),
+    el("div", { class: "badges" }, isRun ? null : el("span", { class: "badge sport-badge" }, sport.name(run.sport_type)),
+      tagChip(run), ...runBadges(run)),
     el("div", { class: "tiles" }, ...tiles.map(([label, value, kind]) =>
       el("div", { class: `tile stat-${kind}` }, el("div", { class: "tile-label" }, label), el("div", { class: "tile-value" }, value)))),
-    s.elapsed_s - s.moving_s >= 60
+    moved && s.elapsed_s - s.moving_s >= 60
       ? el("p", { class: "muted small" }, "Moving time leaves out stops; total time includes them.") : null);
 
   // ----- summary -----
@@ -62,26 +69,27 @@ async function renderRunPage(id) {
         `For privacy, the route within ${detail.privacy_m} m of the start and finish isn't shown, so S and F mark where the visible route begins and ends.`) : null);
   } else if (detail.route_hidden) {
     mapCard = el("section", { class: "card muted" }, "This whole route is inside your privacy zone (close to where you usually start), so the map isn't shown on the website.");
-  } else if (run.streams_status === "done") {
-    mapCard = el("section", { class: "card muted" }, "No GPS on this run, so there's no map to show.");
+  } else if (run.streams_status === "done" && moved) {
+    mapCard = el("section", { class: "card muted" }, `No GPS on this ${isRun ? "run" : "one"}, so there's no map to show.`);
   }
 
   // ----- splits -----
-  const splitsCard = detail.splits && detail.splits.length ? splitsSection(detail.splits, s.pace_s_per_km) : null;
+  const splitsCard = detail.splits && detail.splits.length ? splitsSection(detail.splits, s.pace_s_per_km, run.sport_type) : null;
 
   // ----- profile chart -----
   const profileCard = detail.series ? profileSection(detail) : null;
 
-  page.replaceChildren(backLink(run.id), header, summary, mapCard, splitsCard, profileCard,
+  page.replaceChildren(...[backLink(run.id, isRun), header, summary, mapCard, splitsCard, profileCard,
     run.streams_status !== "done"
-      ? el("section", { class: "card muted" }, run.streams_note || "The detailed recording for this run hasn't downloaded yet – try Sync now.")
-      : null);
+      ? el("section", { class: "card muted" }, run.streams_note || "The detailed recording hasn't downloaded yet – try Sync now.")
+      : null].filter(Boolean));   // replaceChildren would print a null as the word "null"
 
   if (detail.has_gps) drawMap(detail);
   if (profileCard) drawProfile();
 }
 
-function backLink(runId) {
+function backLink(runId, isRun = true) {
+  if (!isRun) return el("div", { class: "page-links" }, el("a", { href: "#/activities", class: "back" }, "← Other activities"));
   return el("div", { class: "page-links" },
     el("a", { href: "#/", class: "back" }, "← All runs"),
     runId ? el("a", { href: `#/compare/${runId}`, class: "back" }, "Compare with other runs →") : null);
@@ -134,7 +142,7 @@ function moveMapDot(latlng) {
 
 // ---------------------------------------------------------------- splits
 
-function splitsSection(splits, avgPace) {
+function splitsSection(splits, avgPace, type) {
   // Longer bar = faster km. Bars start at zero so their lengths are honest.
   const fastest = Math.max(...splits.map((s) => 1000 / s.pace_s_per_km));
   const avgPct = avgPace ? (1000 / avgPace) / fastest * 100 : null;
@@ -147,7 +155,7 @@ function splitsSection(splits, avgPace) {
       el("div", { class: "split-bar-wrap", role: "cell", "aria-hidden": "true" },
         el("div", { class: "split-bar", style: `width:${pct.toFixed(1)}%` }),
         avgPct ? el("div", { class: "split-avg", style: `left:${avgPct.toFixed(1)}%` }) : null),
-      el("div", { class: "split-pace num", role: "cell" }, fmt.pace(s.pace_s_per_km, false)),
+      el("div", { class: "split-pace num", role: "cell" }, sport.speed(s.pace_s_per_km, type, false)),
       el("div", { class: "split-hr num", role: "cell" }, s.avg_hr ? `${s.avg_hr}` : "—"),
       el("div", { class: "split-elev num", role: "cell" }, elev));
   });
@@ -159,7 +167,7 @@ function splitsSection(splits, avgPace) {
     el("div", { class: "splits", role: "table", "aria-label": "Kilometre splits" },
       el("div", { class: "split-row split-head", role: "row" },
         el("div", { role: "columnheader" }, "Km"), el("div", { role: "columnheader" }, ""),
-        el("div", { class: "num", role: "columnheader" }, "Pace"),
+        el("div", { class: "num", role: "columnheader" }, sport.isRide(type) ? "km/h" : "Pace"),
         el("div", { class: "num", role: "columnheader" }, "HR"),
         el("div", { class: "num", role: "columnheader" }, "Height")),
       ...rows));
@@ -179,8 +187,8 @@ function profileSection(d) {
   if (!available.length) return null;
   if (!available.some(([k]) => k === profileMetric)) profileMetric = available[0][0];
   const buttons = available.map(([k, m]) =>
-    el("button", { type: "button", class: "seg-btn", "aria-pressed": String(k === profileMetric),
-      onclick: () => { profileMetric = k; drawProfile(); } }, m.label));
+    el("button", { type: "button", class: "seg-btn", "data-k": k, "aria-pressed": String(k === profileMetric),
+      onclick: () => { profileMetric = k; drawProfile(); } }, k === "pace" && sport.isRide(currentRun.run.sport_type) ? "Speed" : m.label));
   return el("section", { class: "card" },
     el("div", { class: "list-head" },
       el("h2", {}, d.series.x_km ? "Along the way" : "Heart rate over time"),
@@ -193,7 +201,7 @@ function profileSection(d) {
 function drawProfile() {
   const d = currentRun.detail;
   const m = METRICS[profileMetric];
-  document.querySelectorAll(".seg-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === m.label)));
+  document.querySelectorAll("#page-run .seg-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === profileMetric)));
   $("profile-note").textContent = {
     elevation: "Height above sea level, lightly smoothed.",
     pace: "Smoothed over ~30 seconds. Faster is higher; gaps are stops.",
@@ -201,17 +209,24 @@ function drawProfile() {
   }[profileMetric];
 
   const xs = d.series.x_km || d.series.x_min;
+  // On a bike, show speed (km/h) rather than pace: higher is faster either way
+  const ride = sport.isRide(currentRun.run.sport_type);
+  const kmh = (v) => (v ? 3600 / v : null);
+  const asSpeed = ride && profileMetric === "pace";
+  if (asSpeed) $("profile-note").textContent = "Speed, smoothed over ~30 seconds. Gaps are stops.";
   lineChart($("profile-chart"), {
-    xs, ys: d.series[m.key], invert: m.invert, area: profileMetric === "elevation",
-    topLabel: m.invert ? "faster ↑" : null,
+    xs, ys: asSpeed ? d.series.pace.map(kmh) : d.series[m.key], invert: m.invert && !asSpeed, area: profileMetric === "elevation",
+    topLabel: m.invert && !asSpeed ? "faster ↑" : null,
     xFormat: d.series.x_km ? (v) => `${+v.toFixed(1)} km` : (v) => `${Math.round(v)} min`,
-    yFormat: m.tick || ((v) => `${Math.round(v)}`),
+    yFormat: asSpeed ? (v) => `${Math.round(v)}` : m.tick || ((v) => `${Math.round(v)}`),
     tooltip: (i) => {
       const rows = [[d.series.x_km ? `${xs[i].toFixed(2)} km` : `${Math.round(xs[i])} min`,
                      d.series.t ? `${fmt.duration(d.series.t[i])} in` : ""]];
       for (const [k, mm] of Object.entries(METRICS)) {
         const v = d.series[mm.key] && d.series[mm.key][i];
-        if (d.series[mm.key]) rows.push([v == null ? (k === "pace" ? "stopped" : "—") : mm.format(v), mm.label]);
+        if (!d.series[mm.key]) continue;
+        if (k === "pace" && ride) rows.push([v == null ? "stopped" : sport.speed(v, "Ride"), "Speed"]);
+        else rows.push([v == null ? (k === "pace" ? "stopped" : "—") : mm.format(v), mm.label]);
       }
       return rows;
     },

@@ -110,6 +110,7 @@ async function startSync() {
 async function refreshPages() {
   await renderRuns();
   if (!$("page-overview").hidden) await renderOverview();
+  if (!$("page-activities").hidden) await renderActivities();
 }
 
 function poll() {
@@ -119,8 +120,8 @@ function poll() {
     let status;
     try { status = await refresh(); } catch { return; }   // server stopped – try again next tick
     // Refresh the list as runs arrive, not on every tick
-    if (status.counts.runs + status.counts.pending !== lastPending) {
-      lastPending = status.counts.runs + status.counts.pending;
+    if (status.counts.activities + status.counts.pending !== lastPending) {
+      lastPending = status.counts.activities + status.counts.pending;
       refreshPages();
     }
     if (!status.sync.running) {
@@ -132,22 +133,28 @@ function poll() {
 }
 
 // Simple page switching using the part of the address after "#"
-const PAGES = ["overview", "list", "run", "compare"];
+const PAGES = ["overview", "list", "activities", "run", "compare"];
 function route() {
   if (!DATA.isUnlocked()) return;
   const run = location.hash.match(/^#\/run\/(\d+)/);
   const cmp = location.hash.match(/^#\/compare\/?([\d,]*)/);
-  const page = run ? "run" : cmp ? "compare" : location.hash.startsWith("#/runs") ? "list" : "overview";
+  const page = run ? "run" : cmp ? "compare" : location.hash.startsWith("#/runs") ? "list"
+    : location.hash.startsWith("#/activities") ? "activities" : "overview";
   for (const p of PAGES) $(`page-${p}`).hidden = p !== page;
-  document.querySelectorAll(".nav-link").forEach((a) =>
-    a.setAttribute("aria-current", a.dataset.page === page || (page === "run" && a.dataset.page === "list") ? "page" : "false"));
+  setNav(page === "run" ? "list" : page);   // the run page moves this to "activities" for a walk, ride…
   if (page !== "run" && runMap) { runMap.remove(); runMap = null; }
   if (page !== "compare" && compareMap) { compareMap.remove(); compareMap = null; }
   if (page === "overview") renderOverview();
   if (page === "list") renderRuns();
+  if (page === "activities") renderActivities();
   if (run) renderRunPage(Number(run[1]));
   if (cmp) renderComparePage([...new Set(cmp[1].split(",").filter(Boolean).map(Number))].slice(0, MAX_COMPARE));
   window.scrollTo(0, 0);
+}
+
+function setNav(page) {
+  document.querySelectorAll(".nav-link").forEach((a) =>
+    a.setAttribute("aria-current", a.dataset.page === page ? "page" : "false"));
 }
 
 // ---------- website: password screen ----------

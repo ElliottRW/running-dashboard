@@ -1,18 +1,22 @@
-"""Background sync: fetch new runs and their detailed streams from Strava.
+"""Background sync: fetch new activities (runs, walks, rides…) and their detailed streams from Strava.
 
 The first sync backfills your whole history. Everything is saved as it
 arrives, so if Strava's rate limit is hit (or you close the app) the next
 sync carries on from where it stopped instead of starting again.
 """
 import threading
+import time
 from datetime import datetime, timezone
 
 import db
 import strava
 
-RUN_TYPES = {"Run", "TrailRun"}
 STREAM_KEYS = "time,latlng,distance,altitude,heartrate,velocity_smooth,cadence"
 PAGE_SIZE = 200  # the most Strava allows per page – fewer requests
+
+
+class OutOfTime(Exception):
+    """The sync's time budget ran out (GitHub stops jobs after 2 hours)."""
 
 
 def _now_iso():
@@ -22,6 +26,8 @@ def _now_iso():
 class SyncManager:
     def __init__(self, on_complete=None):
         self.on_complete = on_complete  # e.g. recalculate stats after a sync
+        self.time_budget_s = None       # stop (saving progress) rather than wait past this
+        self._deadline = None
         self._new_ids = []
         self._lock = threading.Lock()
         self._thread = None
@@ -58,6 +64,13 @@ class SyncManager:
 
     def _run(self):
         self._new_ids = []
+        self._deadline = time.monotonic() + self.time_budget_s if self.time_budget_s else None
+        if not db.get_meta("all_activity_types", False):
+            # Older versions only saved runs – go through your history once more to pick up
+            # walks, rides and everything else. Runs already saved are simply kept.
+            db.set_meta("backfill_complete", False)
+            db.set_meta("backfill_before", None)
+            db.set_meta("all_activity_types", True)
         # During the very first import every run is "new", so don't celebrate PBs then
         history_was_complete = db.get_meta("backfill_complete", False)
         try:
@@ -72,9 +85,9 @@ class SyncManager:
                 self.on_complete()
             msg = "All up to date."
             if self.state.get("removed"):
-                msg = f"Removed {self.state['removed']} run(s) deleted on Strava. " + msg
+                msg = f"Removed {self.state['removed']} activit{'y' if self.state['removed'] == 1 else 'ies'} deleted on Strava. " + msg
             if self.state["new_runs"]:
-                msg = f"Found {self.state['new_runs']} new run(s). " + msg
+                msg = f"Found {self.state['new_runs']} new activit{'y' if self.state['new_runs'] == 1 else 'ies'}. " + msg
             self._set(phase="done", message=msg, paused_until=None)
         except strava.NotConfigured:
             self._fail("config", "Your Strava Client ID and Secret aren't set yet. "
@@ -92,6 +105,12 @@ class SyncManager:
                        "Strava's daily limit reached. Your progress is saved – the next "
                        "sync after this time will carry on where it stopped.",
                        paused_until=e.resume_at.isoformat())
+        except OutOfTime:
+            db.set_meta("last_sync", _now_iso())
+            if self.on_complete:
+                self.on_complete()
+            self._fail("time_limit", "Stopped for now to stay within the time limit. Your progress is "
+                                     "saved – the next sync will carry on where it stopped.")
         except Exception as e:  # anything unexpected – show it rather than hide it
             self._fail("unknown", f"Something went wrong during sync: {e}")
         finally:
@@ -109,6 +128,8 @@ class SyncManager:
             except strava.RateLimited as e:
                 if e.daily:
                     raise
+                if self._deadline and time.monotonic() + (e.resume_at - datetime.now(timezone.utc)).total_seconds() > self._deadline:
+                    raise OutOfTime()
                 previous = (self.state["phase"], self.state["message"])
                 self._set(phase="paused", paused_until=e.resume_at.isoformat(),
                           message="Pausing to stay within Strava's limit of 100 requests "
@@ -121,18 +142,17 @@ class SyncManager:
     def _save_page(self, activities):
         found = 0
         for a in activities:
-            if (a.get("sport_type") or a.get("type")) in RUN_TYPES:
-                if db.upsert_activity(a):
-                    found += 1
-                    self._new_ids.append(a["id"])
+            if db.upsert_activity(a):
+                found += 1
+                self._new_ids.append(a["id"])
         return found
 
     def _list_new_runs(self):
-        """Anything newer than the newest run we already have."""
+        """Anything newer than the newest activity we already have."""
         newest = db.newest_start_epoch()
         if newest is None:
             return
-        self._set(phase="listing", message="Checking Strava for new runs…")
+        self._set(phase="listing", message="Checking Strava for new activities…")
         page = 1
         while True:
             _, acts = self._call("/athlete/activities",
@@ -145,7 +165,7 @@ class SyncManager:
 
     def _refresh_recent(self):
         """Re-check your latest activities, so changes made on Strava come through:
-        new names, private/public, and runs you've deleted or changed to another sport.
+        new names, private/public, sport changes, and activities you've deleted.
 
         Strava lists activities newest first, so one page covers everything back to the
         oldest activity on it – anything we have in that time span that isn't on the page
@@ -159,12 +179,12 @@ class SyncManager:
         if not acts:
             return
         self._set(new_runs=self.state["new_runs"] + self._save_page(acts))
-        # Without permission to see private activities, private runs would look "deleted" – so don't remove anything
+        # Without permission to see private activities, private ones would look "deleted" – so don't remove anything
         if "activity:read_all" not in ((db.get_auth() or {}).get("scope") or ""):
             return
-        still_runs = {a["id"] for a in acts if (a.get("sport_type") or a.get("type")) in RUN_TYPES}
+        still_there = {a["id"] for a in acts}
         oldest = min(db.utc_epoch(a["start_date"]) for a in acts)
-        for gone in db.ids_since(oldest) - still_runs:
+        for gone in db.ids_since(oldest) - still_there:
             db.delete_activity(gone)
             self._set(removed=self.state.get("removed", 0) + 1)
 
@@ -177,10 +197,10 @@ class SyncManager:
         if db.get_meta("backfill_complete", False):
             return
         before = db.get_meta("backfill_before")
-        total_found = db.counts()["runs"]
+        total_found = db.counts()["activities"]
         while True:
             self._set(phase="listing",
-                      message=f"Loading your run history from Strava… {total_found} runs found so far.")
+                      message=f"Loading your history from Strava… {total_found} activities found so far.")
             params = {"per_page": PAGE_SIZE}
             if before:
                 params["before"] = before
@@ -201,18 +221,18 @@ class SyncManager:
         total = len(ids)
         for i, activity_id in enumerate(ids):
             self._set(phase="streams", done=i, total=total,
-                      message=f"Downloading run details {i + 1} of {total}…")
+                      message=f"Downloading activity details {i + 1} of {total}…")
             status, data = self._call(f"/activities/{activity_id}/streams",
                                       {"keys": STREAM_KEYS, "key_by_type": "true"})
             if status == 404 or not data:
                 db.mark_streams_missing(
                     activity_id,
-                    "Strava has no detailed data for this run (it may be a manual entry, "
+                    "Strava has no detailed data for this activity (it may be a manual entry, "
                     "deleted, or hidden from this app).")
                 continue
             streams = {k: v.get("data") for k, v in data.items() if isinstance(v, dict)}
             if not streams.get("time"):
-                db.mark_streams_missing(activity_id, "This run has no timed recording to analyse.")
+                db.mark_streams_missing(activity_id, "This activity has no timed recording to analyse.")
                 continue
             # Treadmill runs often have heart rate but no distance recording –
             # keep what's there; stats fall back to Strava's summary distance.
