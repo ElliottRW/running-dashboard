@@ -230,6 +230,19 @@ def list_runs_basic(limit=500):
     return [dict(r) for r in rows]
 
 
+def delete_activity(activity_id):
+    """Forget a run that's been deleted on Strava (or is no longer a run)."""
+    with _lock, connect() as conn:
+        for table, col in (("run_stats", "activity_id"), ("streams", "activity_id"), ("activities", "id")):
+            conn.execute(f"DELETE FROM {table} WHERE {col} = ?", (activity_id,))
+
+
+def ids_since(start_epoch):
+    with connect() as conn:
+        rows = conn.execute("SELECT id FROM activities WHERE start_epoch >= ?", (start_epoch,)).fetchall()
+    return {r["id"] for r in rows}
+
+
 def get_activity(activity_id):
     with connect() as conn:
         row = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,)).fetchone()

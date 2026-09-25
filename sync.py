@@ -39,7 +39,7 @@ class SyncManager:
             self._stop.clear()
             self.state.update(running=True, phase="starting", message="Starting sync…",
                               done=0, total=0, paused_until=None, error=None,
-                              error_kind=None, new_runs=0)
+                              error_kind=None, new_runs=0, removed=0)
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
             return True
@@ -62,6 +62,7 @@ class SyncManager:
         history_was_complete = db.get_meta("backfill_complete", False)
         try:
             self._list_new_runs()
+            self._refresh_recent()
             self._backfill_history()
             self._fetch_streams()
             db.set_meta("last_sync", _now_iso())
@@ -70,6 +71,8 @@ class SyncManager:
             if self.on_complete:
                 self.on_complete()
             msg = "All up to date."
+            if self.state.get("removed"):
+                msg = f"Removed {self.state['removed']} run(s) deleted on Strava. " + msg
             if self.state["new_runs"]:
                 msg = f"Found {self.state['new_runs']} new run(s). " + msg
             self._set(phase="done", message=msg, paused_until=None)
@@ -139,6 +142,31 @@ class SyncManager:
             if len(acts) < PAGE_SIZE:
                 return
             page += 1
+
+    def _refresh_recent(self):
+        """Re-check your latest activities, so changes made on Strava come through:
+        new names, private/public, and runs you've deleted or changed to another sport.
+
+        Strava lists activities newest first, so one page covers everything back to the
+        oldest activity on it – anything we have in that time span that isn't on the page
+        has been deleted on Strava.
+        """
+        if not db.get_meta("backfill_complete", False):
+            return   # the first import is still running and will fetch everything anyway
+        self._set(phase="listing", message="Checking for changes made on Strava…")
+        _, acts = self._call("/athlete/activities", {"per_page": PAGE_SIZE, "page": 1})
+        acts = acts or []
+        if not acts:
+            return
+        self._set(new_runs=self.state["new_runs"] + self._save_page(acts))
+        # Without permission to see private activities, private runs would look "deleted" – so don't remove anything
+        if "activity:read_all" not in ((db.get_auth() or {}).get("scope") or ""):
+            return
+        still_runs = {a["id"] for a in acts if (a.get("sport_type") or a.get("type")) in RUN_TYPES}
+        oldest = min(db.utc_epoch(a["start_date"]) for a in acts)
+        for gone in db.ids_since(oldest) - still_runs:
+            db.delete_activity(gone)
+            self._set(removed=self.state.get("removed", 0) + 1)
 
     def _backfill_history(self):
         """Walk backwards through your whole history, one page at a time.
