@@ -226,6 +226,21 @@ td.date { white-space: nowrap; }
   padding: 2px 8px; border-radius: 999px;
 }
 
+/* ---------- top 10 ---------- */
+#top10 .chart { outline-offset: 4px; }
+.chart .effort-dot { fill: var(--faint); stroke: var(--bg); stroke-width: 2; opacity: .7; }
+.chart .effort-dot.top { fill: var(--series-1); opacity: 1; }
+.chart .line.avg-line { stroke: var(--series-2); }
+.chart .hover-ring { fill: none; stroke: var(--text); stroke-width: 1.5; }
+.chart .best-label { fill: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#top10 .chart svg { cursor: pointer; }
+.t10-key-dot { display: inline-block; width: 9px; height: 9px; border-radius: 99px; background: var(--faint); margin-right: 6px; vertical-align: 0; }
+.t10-key-dot.top { background: var(--series-1); }
+.t10-key-line { display: inline-block; width: 18px; height: 2px; border-radius: 2px; background: var(--series-2); margin-right: 6px; vertical-align: 3px; }
+.top10-table { margin-top: 8px; }
+.top10-table td.rank { color: var(--muted); width: 2em; }
+.top10-table a { color: var(--text); text-decoration-color: var(--faint); text-underline-offset: 3px; }
+
 /* ---------- run list ---------- */
 .runs-table td { padding-top: 14px; padding-bottom: 14px; }
 .run-name { font-weight: 550; display: flex; align-items: center; gap: 8px; }

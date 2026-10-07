@@ -86,6 +86,30 @@
         <div id="pb-grid" class="pb-grid"></div>
       </section>
 
+      <section id="top10" class="card" hidden>
+        <div class="list-head">
+          <h2>Your top 10</h2>
+          <div class="segmented" role="group" aria-label="Distance">
+            <button type="button" class="seg-btn" data-d="1k">1 km</button>
+            <button type="button" class="seg-btn" data-d="5k">5 km</button>
+            <button type="button" class="seg-btn" data-d="10k">10 km</button>
+          </div>
+        </div>
+        <p id="top10-note" class="muted small"></p>
+        <div class="legend" aria-hidden="true">
+          <span><span class="t10-key-dot top"></span>Top 10</span>
+          <span><span class="t10-key-dot"></span>Other runs</span>
+          <span><span class="t10-key-line"></span>Average of your last 5</span>
+        </div>
+        <div id="top10-chart" class="chart" tabindex="0" aria-label="Fastest efforts chart. Use the arrow keys to step through runs."></div>
+        <div class="table-wrap">
+          <table class="top10-table">
+            <thead><tr><th class="num">#</th><th class="num">Time</th><th class="num">Pace</th><th>Date</th><th>Run</th></tr></thead>
+            <tbody id="top10-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <div class="overview-grid">
       <section class="card">
         <h2>This week's check-in</h2>
@@ -208,6 +232,7 @@
   <script src="static/compare.js"></script>
   <script src="static/runs.js"></script>
   <script src="static/activities.js"></script>
+  <script src="static/top10.js"></script>
   <script src="static/overview.js"></script>
   <script src="static/app.js"></script>
 </body>

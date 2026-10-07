@@ -11,6 +11,7 @@ async function renderOverview() {
 
   const runs = data.runs.filter((r) => r.stats && !r.duplicate_of);
   renderHello(runs, await DATA.status());
+  renderTop10(runs);
   renderWeeks(runs);
   renderEffort(runs, maxHr);
   renderSettings(runs, maxHr);
