@@ -79,12 +79,16 @@ function runBadges(r) {
   if (r.streams_status === "missing") b.push(["No detailed data", r.streams_note]);
   // A gym session or yoga class never has GPS – only mention it when there was some distance
   const onTheMove = isRunType(r) || (r.summary_distance || 0) > 0;
-  if (r.streams_status === "done" && !r.has_gps && onTheMove) b.push([r.trainer ? (isRunType(r) ? "Treadmill – no GPS" : "Indoor – no GPS") : "No GPS", r.streams_note || "No map or GPS-based stats for this one."]);
-  if (r.streams_status === "done" && !r.has_hr) b.push(["No heart rate", "Your watch didn't record heart rate on this one."]);
+  if (r.streams_status === "done" && !r.has_gps && onTheMove) b.push([r.trainer ? (isRunType(r) ? "Treadmill – no GPS" : "Indoor – no GPS") : "No GPS",
+    isTreadmillRun(r) ? "No map or GPS-based stats. Heart rate is left out too – it can't be tracked reliably on a treadmill."
+      : r.streams_note || "No map or GPS-based stats for this one."]);
+  if (r.streams_status === "done" && !r.has_hr && !isTreadmillRun(r)) b.push(["No heart rate", "Your watch didn't record heart rate on this one."]);
   return b.map(([text, title]) => el("span", { class: "badge", title }, text));
 }
 
 const isRunType = (r) => r.sport_type === "Run" || r.sport_type === "TrailRun";
+// Heart rate can't be tracked reliably on a treadmill, so it's left out of those runs
+const isTreadmillRun = (r) => !!r.trainer && isRunType(r);
 
 function renderRunList() {
   const { runs } = runsData;
@@ -96,7 +100,7 @@ function renderRunList() {
 
   $("run-rows").replaceChildren(...shown.map((r) => {
     const s = r.stats || {};
-    const noHr = r.streams_status === "done" && !r.has_hr;
+    const noHr = (r.streams_status === "done" && !r.has_hr) || isTreadmillRun(r);
     const row = el("tr", { class: `run-row${r.duplicate_of ? " is-dup" : ""}` },
       el("td", { class: "date", "data-label": "Date" },
         el("div", {}, fmt.day(r.start_date_local)),

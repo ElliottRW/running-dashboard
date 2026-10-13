@@ -18,7 +18,7 @@ async function renderRunPage(id) {
   const { run, detail } = found;
   currentRun = { run, detail };
   const s = run.stats || {};
-  const noHr = run.streams_status === "done" && !run.has_hr;
+  const noHr = (run.streams_status === "done" && !run.has_hr) || isTreadmillRun(run);
   const isRun = isRunType(run);
   if (!isRun) setNav("activities");
   const metres = s.distance_m ?? run.summary_distance;
@@ -73,13 +73,16 @@ async function renderRunPage(id) {
     mapCard = el("section", { class: "card muted" }, `No GPS on this ${isRun ? "run" : "one"}, so there's no map to show.`);
   }
 
+  // ----- treadmill intervals -----
+  const intervalsCard = detail.intervals && detail.intervals.length ? intervalsSection(detail.intervals) : null;
+
   // ----- splits -----
   const splitsCard = detail.splits && detail.splits.length ? splitsSection(detail.splits, s.pace_s_per_km, run.sport_type) : null;
 
   // ----- profile chart -----
   const profileCard = detail.series ? profileSection(detail) : null;
 
-  page.replaceChildren(...[backLink(run.id, isRun), header, summary, mapCard, splitsCard, profileCard,
+  page.replaceChildren(...[backLink(run.id, isRun), header, summary, intervalsCard, mapCard, splitsCard, profileCard,
     run.streams_status !== "done"
       ? el("section", { class: "card muted" }, run.streams_note || "The detailed recording hasn't downloaded yet – try Sync now.")
       : null].filter(Boolean));   // replaceChildren would print a null as the word "null"
@@ -170,6 +173,47 @@ function splitsSection(splits, avgPace, type) {
         el("div", { class: "num", role: "columnheader" }, sport.isRide(type) ? "km/h" : "Pace"),
         el("div", { class: "num", role: "columnheader" }, "HR"),
         el("div", { class: "num", role: "columnheader" }, "Height")),
+      ...rows));
+}
+
+// ---------------------------------------------------------------- treadmill intervals
+
+function intervalsSection(blocks) {
+  // Longer bar = faster block, on the same scale for runs and walks.
+  const fastest = Math.max(...blocks.map((b) => (b.pace_s_per_km ? 1000 / b.pace_s_per_km : 0)));
+  const runs = blocks.filter((b) => b.kind === "run");
+  const rows = blocks.map((b) => {
+    const pct = b.pace_s_per_km ? (1000 / b.pace_s_per_km) / fastest * 100 : 0;
+    const steps = b.steps && b.steps.length > 1
+      ? el("div", { class: "interval-steps muted small", role: "cell" },
+          "Belt speed: ", b.steps.map((st) => `${st.kmh}`).join(" → "), " km/h",
+          el("span", { class: "sr-only" }, ` (${b.steps.map((st) => fmt.duration(st.seconds)).join(", ")} each)`))
+      : null;
+    return el("div", { class: `interval-row ${b.kind}`, role: "row" },
+      el("div", { class: "interval-name", role: "cell" },
+        b.kind === "run" ? `Run ${b.number}` : "Walk",
+        el("div", { class: "muted small" }, `from ${fmt.duration(b.start_s)}`)),
+      el("div", { class: "split-bar-wrap", role: "cell", "aria-hidden": "true" },
+        el("div", { class: "split-bar", style: `width:${pct.toFixed(1)}%` })),
+      el("div", { class: "num", role: "cell" }, fmt.duration(b.seconds)),
+      el("div", { class: "num interval-dist", role: "cell" }, fmt.km(b.metres)),
+      el("div", { class: "num split-pace", role: "cell" }, fmt.pace(b.pace_s_per_km, false)),
+      steps);
+  });
+  const runTime = runs.reduce((t, b) => t + b.seconds, 0);
+  const runMetres = runs.reduce((t, b) => t + b.metres, 0);
+  return el("section", { class: "card" },
+    el("h2", {}, "Treadmill intervals"),
+    el("p", { class: "muted small" },
+      `${runs.length} running ${runs.length === 1 ? "block" : "blocks"}: ${fmt.duration(runTime)} and ${fmt.km(runMetres)} `,
+      `at ${fmt.pace(runTime / (runMetres / 1000))} on average, with walking or stops left out. `,
+      "Longer bar = faster. The belt speeds show how each block built up."),
+    el("div", { class: "splits intervals", role: "table", "aria-label": "Treadmill intervals" },
+      el("div", { class: "interval-row split-head", role: "row" },
+        el("div", { role: "columnheader" }, ""), el("div", { role: "columnheader" }, ""),
+        el("div", { class: "num", role: "columnheader" }, "Time"),
+        el("div", { class: "num interval-dist", role: "columnheader" }, "Distance"),
+        el("div", { class: "num", role: "columnheader" }, "Pace")),
       ...rows));
 }
 

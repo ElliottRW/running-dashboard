@@ -5,7 +5,7 @@ the watch's distance recording, then to Strava's summary distance.
 """
 import math
 
-STATS_VERSION = 2           # bump when the maths changes, so stats get recalculated
+STATS_VERSION = 3           # bump when the maths changes, so stats get recalculated
 RUN_TYPES = {"Run", "TrailRun"}  # everything else (walks, rides…) is an "other activity"
 RIDE_TYPES = {"Ride", "VirtualRide", "EBikeRide", "EMountainBikeRide", "GravelRide", "MountainBikeRide",
               "Handcycle", "Velomobile"}
@@ -36,6 +36,19 @@ def smooth(values, half_window):
 
 def is_run(activity):
     return (activity or {}).get("sport_type") in RUN_TYPES
+
+
+def is_treadmill_run(activity):
+    return is_run(activity) and bool((activity or {}).get("trainer"))
+
+
+def heart_rate(activity, streams):
+    """The heart rate recording, or None. Treadmill runs are left out: neither the
+    treadmill's sensor nor a wrist watch tracks it reliably there."""
+    hr = streams.get("heartrate")
+    if not hr or len(hr) != len(streams.get("time") or []) or is_treadmill_run(activity):
+        return None
+    return hr
 
 
 def gps_distance(time, latlng, glitch_speed=GLITCH_SPEED):
@@ -127,9 +140,9 @@ def compute(activity, streams):
         moving = activity.get("moving_time") or 0
     elapsed = (time[-1] - time[0]) if len(time) > 1 else activity.get("elapsed_time") or 0
 
-    hr = streams.get("heartrate") or []
+    hr = heart_rate(activity, streams)
     avg_hr = max_hr = None
-    if hr and len(hr) == len(time):
+    if hr:
         # Weight each reading by how long it lasted, so gaps don't skew the average
         total = weighted = 0
         for i in range(1, len(time)):
@@ -189,6 +202,10 @@ PACE_WINDOW_S = 30          # smooth pace over ~30 seconds
 SLOWEST_PACE_SPEED = 1.0    # m/s – slower than ~16:40 /km is a stop/walk: gap in the pace line
 SLOWEST_OTHER_SPEED = 0.5   # m/s – walks and hikes go slower, so only true stops leave a gap
 CHART_POINTS = 800          # plenty for a smooth line, light enough for a phone
+INTERVAL_RUN_SPEED = 2.0    # m/s (7.2 km/h) – treadmill belt faster than this counts as running
+INTERVAL_MIN_S = 20         # blips shorter than this (speeding up/slowing down) join their neighbour
+STEP_CHANGE_KMH = 0.3       # a belt-speed change of at least this starts a new step
+STEP_MIN_S = 15             # shorter steps are just the belt changing speed
 
 
 def interp(xs, ys, x):
@@ -264,6 +281,94 @@ def splits(time, dist, mtime, alt, hr):
         })
         start = end
     return rows
+
+
+def _merge_short(blocks, min_s, same):
+    """Fold blocks shorter than min_s into the block before them (or after, at the start),
+    then join neighbours that now match. Blocks are [start_index, end_index, label, seconds]."""
+    out = [list(b) for b in blocks]
+    while len(out) > 1:
+        k = next((k for k, b in enumerate(out) if b[3] < min_s), None)
+        if k is None:
+            break
+        short = out.pop(k)
+        into = out[k - 1] if k else out[0]
+        into[0], into[1], into[3] = min(into[0], short[0]), max(into[1], short[1]), into[3] + short[3]
+        joined = []
+        for b in out:
+            if joined and same(joined[-1], b):
+                joined[-1][1], joined[-1][3] = b[1], joined[-1][3] + b[3]
+            else:
+                joined.append(b)
+        out = joined
+    return out
+
+
+def intervals(time, dist, speed_stream=None):
+    """Treadmill sessions: the run and walk blocks, and the belt-speed steps inside each run.
+
+    Uses the treadmill's own speed recording when there is one (it changes in clean steps),
+    otherwise the speed worked out from distance.
+    """
+    n = len(time)
+    if n < 2:
+        return []
+    if speed_stream and len(speed_stream) == n:
+        speed = [s or 0 for s in speed_stream]
+    else:
+        speed = [0.0] + [(dist[i] - dist[i - 1]) / (time[i] - time[i - 1]) if time[i] > time[i - 1] else 0
+                         for i in range(1, n)]
+    dur = [0] + [time[i] - time[i - 1] for i in range(1, n)]   # seconds each sample covers
+
+    # 1) Running vs walking/stopped
+    blocks = []
+    for i in range(1, n):
+        running = speed[i] >= INTERVAL_RUN_SPEED
+        if blocks and blocks[-1][2] == running:
+            blocks[-1][1] = i
+            blocks[-1][3] += dur[i]
+        else:
+            blocks.append([i, i, running, dur[i]])
+    # A few seconds at either end is just the belt starting or stopping
+    while blocks and blocks[0][3] < INTERVAL_MIN_S:
+        blocks.pop(0)
+    while blocks and blocks[-1][3] < INTERVAL_MIN_S:
+        blocks.pop()
+    blocks = _merge_short(blocks, INTERVAL_MIN_S, lambda a, b: a[2] == b[2])
+
+    rows, run_no = [], 0
+    for a, b, running, _ in blocks:
+        t0, t1 = time[a - 1], time[b]
+        secs, metres = t1 - t0, dist[b] - dist[a - 1]
+        row = {
+            "kind": "run" if running else "walk",
+            "start_s": t0,
+            "seconds": secs,
+            "metres": round(metres),
+            "pace_s_per_km": round(secs / (metres / 1000), 1) if metres >= 10 else None,
+        }
+        if running:
+            run_no += 1
+            row["number"] = run_no
+            row["steps"] = _speed_steps(speed[a:b + 1], dur[a:b + 1])
+        rows.append(row)
+    return rows if run_no else []
+
+
+def _speed_steps(speed, dur):
+    """The belt speeds you held during one run block, e.g. 11.2 → 11.6 → 12.2 km/h."""
+    steps = []   # [first, last, average km/h, seconds]
+    for i, (v, d) in enumerate(zip(speed, dur)):
+        kmh = v * 3.6
+        if steps and abs(kmh - steps[-1][2]) < STEP_CHANGE_KMH:
+            st = steps[-1]
+            st[2] = (st[2] * st[3] + kmh * d) / max(st[3] + d, 1)
+            st[1], st[3] = i, st[3] + d
+        else:
+            steps.append([i, i, kmh, d])
+    # Short steps are just the belt ramping between speeds
+    steps = _merge_short(steps, STEP_MIN_S, lambda a, b: abs(a[2] - b[2]) < STEP_CHANGE_KMH)
+    return [{"kmh": round(s[2], 1), "seconds": s[3]} for s in steps]
 
 
 def _climb(alt, dist, a, b):
@@ -381,7 +486,7 @@ def detail(activity, streams):
     dist, source = cumulative_distance(streams, activity)
     run = is_run(activity)
     slowest = SLOWEST_PACE_SPEED if run else SLOWEST_OTHER_SPEED
-    hr = streams.get("heartrate") if streams.get("heartrate") and len(streams["heartrate"]) == len(time) else None
+    hr = heart_rate(activity, streams)
     alt_raw = streams.get("altitude") if streams.get("altitude") and len(streams["altitude"]) == len(time) else None
     alt = smooth(alt_raw, 3) if alt_raw else None
     latlng = streams.get("latlng") if source == "gps" else None
@@ -405,16 +510,26 @@ def detail(activity, streams):
             "latlng": [latlng[i] for i in idx] if latlng else None,
         }
         out["splits"] = splits(time, dist, mtime, alt, hr)
+        if is_treadmill_run(activity):
+            out["intervals"] = intervals(time, dist, streams.get("velocity_smooth"))
         # The pacing notes are written for runs; other activities just get the numbers
         out["summary"] = summarise(time, dist, mtime, alt, hr) if run else []
+        if is_treadmill_run(activity):   # heart rate is ignored there, so nothing to say about it
+            out["summary"] = [n for n in out["summary"] if n["topic"] != "hr"]
     else:
         # No distance recording at all (e.g. some treadmill runs): heart rate by time only
         out["series"] = {"x_min": [round(time[i] / 60, 2) for i in idx],
                          "hr": [hr[i] for i in idx] if hr else None}
         out["splits"] = []
-        out["summary"] = [{"topic": "pacing", "text":
-                           "This run has no distance recording (common on a treadmill), so there are no "
-                           "km splits or pacing notes – but your heart rate is shown below."}] if run else []
+        if is_treadmill_run(activity):
+            out["summary"] = [{"topic": "pacing", "text":
+                               "This treadmill run has no distance recording, so there are no km splits, "
+                               "intervals or pacing notes. Heart rate isn't shown on treadmill runs either, "
+                               "as it can't be tracked reliably there."}]
+        else:
+            out["summary"] = [{"topic": "pacing", "text":
+                               "This run has no distance recording, so there are no km splits or pacing "
+                               "notes – but your heart rate is shown below."}] if run else []
 
     if latlng:
         pts = [p for p in latlng if p]
@@ -442,7 +557,7 @@ def compare_series(activity, streams):
     if not dist or dist[-1] < 100:
         return None
     n = len(time)
-    hr = streams.get("heartrate") if streams.get("heartrate") and len(streams["heartrate"]) == n else None
+    hr = heart_rate(activity, streams)
     alt = smooth(streams["altitude"], 3) if streams.get("altitude") and len(streams["altitude"]) == n else None
     latlng = streams.get("latlng") if source == "gps" else None
     speed = smoothed_speed(time, dist)
