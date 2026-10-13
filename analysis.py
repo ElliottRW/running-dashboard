@@ -336,27 +336,28 @@ def intervals(time, dist, speed_stream=None):
         blocks.pop()
     blocks = _merge_short(blocks, INTERVAL_MIN_S, lambda a, b: a[2] == b[2])
 
-    rows, run_no = [], 0
-    for a, b, running, _ in blocks:
+    def stretch(a, b):
+        """Time, distance and pace from sample a to sample b (a block covers a-1 → b)."""
         t0, t1 = time[a - 1], time[b]
         secs, metres = t1 - t0, dist[b] - dist[a - 1]
-        row = {
-            "kind": "run" if running else "walk",
-            "start_s": t0,
-            "seconds": secs,
-            "metres": round(metres),
-            "pace_s_per_km": round(secs / (metres / 1000), 1) if metres >= 10 else None,
-        }
+        return {"start_s": t0, "seconds": secs, "metres": round(metres),
+                "pace_s_per_km": round(secs / (metres / 1000), 1) if metres >= 10 else None}
+
+    rows, run_no = [], 0
+    for a, b, running, _ in blocks:
+        row = {"kind": "run" if running else "walk", **stretch(a, b)}
         if running:
             run_no += 1
             row["number"] = run_no
-            row["steps"] = _speed_steps(speed[a:b + 1], dur[a:b + 1])
+            row["steps"] = [{"kmh": round(kmh, 1), **stretch(a + i, a + j)}
+                            for i, j, kmh, _ in _speed_steps(speed[a:b + 1], dur[a:b + 1])]
         rows.append(row)
     return rows if run_no else []
 
 
 def _speed_steps(speed, dur):
-    """The belt speeds you held during one run block, e.g. 11.2 → 11.6 → 12.2 km/h."""
+    """The belt speeds you held during one run block, e.g. 11.2 → 11.6 → 12.2 km/h.
+    Returns [first, last, km/h, seconds] with sample positions inside the block."""
     steps = []   # [first, last, average km/h, seconds]
     for i, (v, d) in enumerate(zip(speed, dur)):
         kmh = v * 3.6
@@ -368,7 +369,7 @@ def _speed_steps(speed, dur):
             steps.append([i, i, kmh, d])
     # Short steps are just the belt ramping between speeds
     steps = _merge_short(steps, STEP_MIN_S, lambda a, b: abs(a[2] - b[2]) < STEP_CHANGE_KMH)
-    return [{"kmh": round(s[2], 1), "seconds": s[3]} for s in steps]
+    return steps
 
 
 def _climb(alt, dist, a, b):

@@ -179,27 +179,25 @@ function splitsSection(splits, avgPace, type) {
 // ---------------------------------------------------------------- treadmill intervals
 
 function intervalsSection(blocks) {
-  // Longer bar = faster block, on the same scale for runs and walks.
-  const fastest = Math.max(...blocks.map((b) => (b.pace_s_per_km ? 1000 / b.pace_s_per_km : 0)));
+  // One row per run/walk block, then one per belt speed inside each run block.
+  // Longer bar = faster, on the same scale for every row.
+  const speedOf = (r) => (r.pace_s_per_km ? 1000 / r.pace_s_per_km : 0);
+  const fastest = Math.max(...blocks.flatMap((b) => [b, ...(b.steps || [])]).map(speedOf));
   const runs = blocks.filter((b) => b.kind === "run");
-  const rows = blocks.map((b) => {
-    const pct = b.pace_s_per_km ? (1000 / b.pace_s_per_km) / fastest * 100 : 0;
-    const steps = b.steps && b.steps.length > 1
-      ? el("div", { class: "interval-steps muted small", role: "cell" },
-          "Belt speed: ", b.steps.map((st) => `${st.kmh}`).join(" → "), " km/h",
-          el("span", { class: "sr-only" }, ` (${b.steps.map((st) => fmt.duration(st.seconds)).join(", ")} each)`))
-      : null;
-    return el("div", { class: `interval-row ${b.kind}`, role: "row" },
-      el("div", { class: "interval-name", role: "cell" },
-        b.kind === "run" ? `Run ${b.number}` : "Walk",
-        el("div", { class: "muted small" }, `from ${fmt.duration(b.start_s)}`)),
+  const row = (r, kind, name, distance) =>
+    el("div", { class: `interval-row ${kind}`, role: "row" },
+      el("div", { class: "interval-name", role: "cell" }, name,
+        el("div", { class: "muted small" }, `from ${fmt.duration(r.start_s)}`)),
       el("div", { class: "split-bar-wrap", role: "cell", "aria-hidden": "true" },
-        el("div", { class: "split-bar", style: `width:${pct.toFixed(1)}%` })),
-      el("div", { class: "num", role: "cell" }, fmt.duration(b.seconds)),
-      el("div", { class: "num interval-dist", role: "cell" }, fmt.km(b.metres)),
-      el("div", { class: "num split-pace", role: "cell" }, fmt.pace(b.pace_s_per_km, false)),
-      steps);
-  });
+        el("div", { class: "split-bar", style: `width:${(speedOf(r) / fastest * 100).toFixed(1)}%` })),
+      el("div", { class: "num", role: "cell" }, fmt.duration(r.seconds)),
+      el("div", { class: "num", role: "cell" }, distance),
+      el("div", { class: "num split-pace", role: "cell" }, fmt.pace(r.pace_s_per_km, false)));
+  const rows = blocks.flatMap((b) => [
+    row(b, b.kind, b.kind === "run" ? `Run ${b.number}` : "Walk", fmt.km(b.metres)),
+    ...(b.kind === "run" && b.steps.length > 1
+      ? b.steps.map((st) => row(st, "step", `${st.kmh} km/h`, `${st.metres} m`)) : []),
+  ]);
   const runTime = runs.reduce((t, b) => t + b.seconds, 0);
   const runMetres = runs.reduce((t, b) => t + b.metres, 0);
   return el("section", { class: "card" },
@@ -207,12 +205,12 @@ function intervalsSection(blocks) {
     el("p", { class: "muted small" },
       `${runs.length} running ${runs.length === 1 ? "block" : "blocks"}: ${fmt.duration(runTime)} and ${fmt.km(runMetres)} `,
       `at ${fmt.pace(runTime / (runMetres / 1000))} on average, with walking or stops left out. `,
-      "Longer bar = faster. The belt speeds show how each block built up."),
+      "Under each block is every belt speed you ran at. Longer bar = faster."),
     el("div", { class: "splits intervals", role: "table", "aria-label": "Treadmill intervals" },
       el("div", { class: "interval-row split-head", role: "row" },
         el("div", { role: "columnheader" }, ""), el("div", { role: "columnheader" }, ""),
         el("div", { class: "num", role: "columnheader" }, "Time"),
-        el("div", { class: "num interval-dist", role: "columnheader" }, "Distance"),
+        el("div", { class: "num", role: "columnheader" }, "Distance"),
         el("div", { class: "num", role: "columnheader" }, "Pace")),
       ...rows));
 }

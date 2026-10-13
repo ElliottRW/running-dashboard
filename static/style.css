@@ -326,14 +326,17 @@ span.tag { cursor: default; }
 .split-avg { position: absolute; top: -5px; bottom: -5px; width: 1.5px; background: var(--text); opacity: .5; }
 .splits .num { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
 .split-pace { font-weight: 600; }
-.interval-row { display: grid; grid-template-columns: 5.2em 1fr 3.6em 4.6em 3.6em; gap: 14px; align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.interval-row { display: grid; grid-template-columns: 6rem 1fr 3.6rem 4.6rem 3.6rem; gap: 14px; align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .interval-row:last-child { border-bottom: 0; }
 .interval-row.split-head { min-height: 26px; padding: 0; }
 .interval-name { font-weight: 600; line-height: 1.2; }
 .interval-name .muted { font-weight: 400; white-space: nowrap; }
 .interval-row.walk .interval-name { font-weight: 400; color: var(--muted); }
 .interval-row.walk .split-bar { opacity: .35; }
-.interval-steps { grid-column: 1 / -1; margin-top: -4px; }
+.interval-row.step { min-height: 36px; padding: 3px 0; border-bottom-style: dashed; font-size: 0.88rem; }
+.interval-row.step .interval-name { font-weight: 400; padding-left: 12px; }
+.interval-row.step .split-bar { opacity: .7; height: 70%; margin-top: 2px; }
+.interval-row.step .split-pace { font-weight: 500; }
 
 .chart { position: relative; margin-top: 12px; touch-action: pan-y; }
 .chart:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; border-radius: 6px; }
@@ -440,8 +443,9 @@ span.tag { cursor: default; }
   .tile-value { font-size: 1.15rem; }
   .map { height: 280px; }
   .split-row { grid-template-columns: 2.2em 1fr 3.6em 2.6em 3.6em; gap: 8px; font-size: 0.88rem; }
-  .interval-row { grid-template-columns: 4.8em 1fr 3.4em 3.4em; gap: 8px; font-size: 0.88rem; }
-  .interval-dist { display: none; }
+  .interval-row { grid-template-columns: 4.9rem 1fr 2.9rem 3.6rem 2.9rem; gap: 8px; font-size: 0.88rem; }
+  .interval-row.step { font-size: 0.82rem; }
+  .interval-row.step .interval-name { padding-left: 8px; }
 
   .week-cols { gap: 3px; }
   .week-val { font-size: 0.64rem; }
