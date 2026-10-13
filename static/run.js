@@ -74,7 +74,7 @@ async function renderRunPage(id) {
   }
 
   // ----- treadmill intervals -----
-  const intervalsCard = detail.intervals && detail.intervals.length ? intervalsSection(detail.intervals) : null;
+  const intervalsCard = detail.intervals && detail.intervals.length ? intervalsSection(detail.intervals, detail.session) : null;
 
   // ----- splits -----
   const splitsCard = detail.splits && detail.splits.length ? splitsSection(detail.splits, s.pace_s_per_km, run.sport_type) : null;
@@ -178,9 +178,9 @@ function splitsSection(splits, avgPace, type) {
 
 // ---------------------------------------------------------------- treadmill intervals
 
-function intervalsSection(blocks) {
+function intervalsSection(blocks, session) {
   // One row per run/walk block, then one per belt speed inside each run block.
-  // Longer bar = faster, on the same scale for every row.
+  // The bar is speed compared with your fastest step; walks get none, as it says nothing useful there.
   const speedOf = (r) => (r.pace_s_per_km ? 1000 / r.pace_s_per_km : 0);
   const fastest = Math.max(...blocks.flatMap((b) => [b, ...(b.steps || [])]).map(speedOf));
   const runs = blocks.filter((b) => b.kind === "run");
@@ -189,7 +189,7 @@ function intervalsSection(blocks) {
       el("div", { class: "interval-name", role: "cell" }, name,
         el("div", { class: "muted small" }, `from ${fmt.duration(r.start_s)}`)),
       el("div", { class: "split-bar-wrap", role: "cell", "aria-hidden": "true" },
-        el("div", { class: "split-bar", style: `width:${(speedOf(r) / fastest * 100).toFixed(1)}%` })),
+        kind === "walk" ? null : el("div", { class: "split-bar", style: `width:${(speedOf(r) / fastest * 100).toFixed(1)}%` })),
       el("div", { class: "num", role: "cell" }, fmt.duration(r.seconds)),
       el("div", { class: "num", role: "cell" }, distance),
       el("div", { class: "num split-pace", role: "cell" }, fmt.pace(r.pace_s_per_km, false)));
@@ -201,11 +201,11 @@ function intervalsSection(blocks) {
   const runTime = runs.reduce((t, b) => t + b.seconds, 0);
   const runMetres = runs.reduce((t, b) => t + b.metres, 0);
   return el("section", { class: "card" },
-    el("h2", {}, "Treadmill intervals"),
+    el("h2", {}, { intervals: "Treadmill intervals", progression: "Progression run" }[session] || "Treadmill breakdown"),
     el("p", { class: "muted small" },
       `${runs.length} running ${runs.length === 1 ? "block" : "blocks"}: ${fmt.duration(runTime)} and ${fmt.km(runMetres)} `,
       `at ${fmt.pace(runTime / (runMetres / 1000))} on average, with walking or stops left out. `,
-      "Under each block is every belt speed you ran at. Longer bar = faster."),
+      "Under each block is every belt speed you ran at. The bar shows speed: the longer it is, the faster you were going."),
     el("div", { class: "splits intervals", role: "table", "aria-label": "Treadmill intervals" },
       el("div", { class: "interval-row split-head", role: "row" },
         el("div", { role: "columnheader" }, ""), el("div", { role: "columnheader" }, ""),

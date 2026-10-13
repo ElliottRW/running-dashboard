@@ -206,6 +206,7 @@ INTERVAL_RUN_SPEED = 2.0    # m/s (7.2 km/h) – treadmill belt faster than this
 INTERVAL_MIN_S = 20         # blips shorter than this (speeding up/slowing down) join their neighbour
 STEP_CHANGE_KMH = 0.3       # a belt-speed change of at least this starts a new step
 STEP_MIN_S = 15             # shorter steps are just the belt changing speed
+PROGRESSION_KMH = 1.0       # one block whose belt speed rises at least this much is a progression run
 
 
 def interp(xs, ys, x):
@@ -372,6 +373,122 @@ def _speed_steps(speed, dur):
     return steps
 
 
+def _list(words):
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _durations(items):
+    """'8:08 and 8:15', or 'about 3:00 each' when they're all within 10 s."""
+    secs = [x["seconds"] for x in items]
+    if len(secs) > 2 and max(secs) - min(secs) <= 10:
+        return f"about {fmt_time(sum(secs) / len(secs))} each"
+    return _list([fmt_time(x) for x in secs])
+
+
+def fmt_time(secs):
+    s = round(secs)
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def treadmill_session(rows):
+    """What kind of treadmill session this was – "intervals", "progression" or "steady" –
+    and plain-English notes about it (None for steady runs: the normal notes fit those)."""
+    runs = [r for r in rows if r["kind"] == "run"]
+    if not runs:
+        return "steady", None
+    word, warm_jog = "blocks", None
+    if len(runs) >= 2:
+        reps = runs
+        gaps = [r for k, r in enumerate(rows) if r["kind"] == "walk" and 0 < k < len(rows) - 1]
+        gap_word = "walk" if all(g["pace_s_per_km"] and g["pace_s_per_km"] > 1000 / INTERVAL_RUN_SPEED
+                                 for g in gaps) else "walk or stop"
+        shape = (f"An interval session: {len(reps)} running blocks ({_durations(reps)}) with "
+                 + (f"a {fmt_time(gaps[0]['seconds'])} {gap_word} in between." if len(gaps) == 1
+                    else f"{gap_word}s of {_durations(gaps)} in between."))
+        kind = "intervals"
+    else:
+        steps = runs[0]["steps"]
+        speeds = [st["kmh"] for st in steps]
+        drops = sum(1 for a, b in zip(speeds, speeds[1:]) if b < a)
+        if drops >= 2:
+            # Fast/slow running without walking: the faster half of the steps are the reps
+            middle = (min(speeds) + max(speeds)) / 2
+            reps = [st for st in steps if st["kmh"] > middle]
+            gaps = [st for st in steps[steps.index(reps[0]):] if st["kmh"] <= middle and st["start_s"] < reps[-1]["start_s"]]
+            fast = _list([str(k) for k in sorted({st["kmh"] for st in reps})])
+            word = "fast stretches"
+            if steps[0] not in reps:
+                warm_jog = steps[0]
+            shape = (f"An interval session: {len(reps)} faster stretches ({_durations(reps)}) at {fast} km/h, "
+                     f"with easier running between them.")
+            kind = "intervals"
+        elif len(steps) >= 2 and speeds[-1] - speeds[0] >= PROGRESSION_KMH and drops == 0:
+            r = runs[0]
+            return "progression", [{"topic": "shape", "text":
+                f"A progression run: you raised the belt from {speeds[0]} to {speeds[-1]} km/h in "
+                f"{len(steps)} steps over {fmt_time(r['seconds'])}, going from {fmt_pace(steps[0]['pace_s_per_km'])} "
+                f"to {fmt_pace(steps[-1]['pace_s_per_km'])}."}] + _warm_cool(rows)
+        else:
+            return "steady", None
+
+    notes = [{"topic": "shape", "text": shape}] if shape else []
+
+    # Did each block build up through the belt speeds?
+    if reps is runs and all(len(r["steps"]) >= 2 and r["steps"][-1]["kmh"] > r["steps"][0]["kmh"] for r in runs):
+        ranges = [f"{r['steps'][0]['kmh']} → {r['steps'][-1]['kmh']} km/h" for r in runs]
+        same = len(set(ranges)) == 1
+        notes.append({"topic": "build", "text":
+            "Each block built up through the belt speeds: " + (f"{ranges[0]} every time." if same else
+            _list([f"{ranges[k]} in block {k + 1}" for k in range(len(runs))]) + ".")})
+
+    # How even were the reps?
+    paces = [r["pace_s_per_km"] for r in reps if r["pace_s_per_km"]]
+    if len(paces) >= 2:
+        first, last = paces[0], paces[-1]
+        spread = max(paces) - min(paces)
+        each = _list([fmt_pace(p).replace(" /km", "") for p in paces]) + " /km"
+        if (last - first) / first > 0.03:
+            notes.append({"topic": "even", "flag": True, "text":
+                f"You slowed over the session: the last of your {word} was {round(last - first)} s per km slower than "
+                f"the first ({each}). Holding the pace to the end is the aim, so a slightly easier start can help."})
+        elif (first - last) / first > 0.03:
+            notes.append({"topic": "even", "text":
+                f"You finished strongest: the last of your {word} was {round(first - last)} s per km faster than the first ({each})."})
+        else:
+            notes.append({"topic": "even", "text":
+                f"Very evenly paced: your {word} were within {max(1, round(spread))} s per km of each other ({each})."})
+
+    # Work and recovery
+    if gaps:
+        work = sum(r["seconds"] for r in reps) / len(reps)
+        rest = sum(g["seconds"] for g in gaps) / len(gaps)
+        if rest < work / 4:
+            notes.append({"topic": "recovery", "text":
+                f"Short recoveries: about {fmt_time(rest)} between {word} of about {fmt_time(work)}. That makes for "
+                f"a tough session – if you want to push the speeds higher, longer recoveries would help."})
+        else:
+            notes.append({"topic": "recovery", "text":
+                f"Recoveries of about {fmt_time(rest)} between {word} of about {fmt_time(work)}."})
+    return kind, notes + _warm_cool(rows, warm_jog)
+
+
+def _warm_cool(rows, warm_jog=None):
+    notes = []
+    first, last = rows[0], rows[-1]
+    if warm_jog:
+        notes.append({"topic": "warmup", "text":
+            f"You warmed up with {fmt_time(warm_jog['seconds'])} of easy running at {warm_jog['kmh']} km/h."})
+    elif first["kind"] == "run" and first["start_s"] < 60:
+        notes.append({"topic": "warmup", "flag": True, "text":
+            "You went straight into running with no warm-up. A few minutes of walking or easy jogging "
+            "first gets your legs ready and usually makes the first block feel easier."})
+    elif first["kind"] == "walk":
+        notes.append({"topic": "warmup", "text": f"You warmed up with a {fmt_time(first['seconds'])} walk."})
+    if last["kind"] == "walk" and last["seconds"] >= 120:
+        notes.append({"topic": "cooldown", "text": f"You cooled down with a {fmt_time(last['seconds'])} walk."})
+    return notes
+
+
 def _climb(alt, dist, a, b):
     """Metres climbed between distances a and b."""
     if not alt:
@@ -511,12 +628,14 @@ def detail(activity, streams):
             "latlng": [latlng[i] for i in idx] if latlng else None,
         }
         out["splits"] = splits(time, dist, mtime, alt, hr)
-        if is_treadmill_run(activity):
-            out["intervals"] = intervals(time, dist, streams.get("velocity_smooth"))
         # The pacing notes are written for runs; other activities just get the numbers
         out["summary"] = summarise(time, dist, mtime, alt, hr) if run else []
-        if is_treadmill_run(activity):   # heart rate is ignored there, so nothing to say about it
-            out["summary"] = [n for n in out["summary"] if n["topic"] != "hr"]
+        if is_treadmill_run(activity):
+            out["intervals"] = intervals(time, dist, streams.get("velocity_smooth"))
+            out["session"], notes = treadmill_session(out["intervals"])
+            # Interval and progression sessions get their own notes; steady runs keep the
+            # usual ones, minus heart rate (ignored on a treadmill)
+            out["summary"] = notes or [n for n in out["summary"] if n["topic"] != "hr"]
     else:
         # No distance recording at all (e.g. some treadmill runs): heart rate by time only
         out["series"] = {"x_min": [round(time[i] / 60, 2) for i in idx],
