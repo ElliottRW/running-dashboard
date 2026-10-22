@@ -157,7 +157,20 @@ This setup is for **one Strava account**. A website on GitHub Pages has no serve
 people's Strava logins safe, and Strava also limits new API apps to the owner's account unless
 Strava approves an increase (your API settings page shows this).
 
-The good option is for each friend to have **their own copy**:
+**Easiest: you host it for them.** Your friend creates a Strava API app at
+<https://www.strava.com/settings/api> (callback domain `localhost`) and sends you its Client ID
+and Secret. Then run this (with a name of your choice):
+
+```bash
+python3 new_dashboard.py alex
+```
+
+It makes `~/src/running-dashboard-alex` and a GitHub repo of the same name, copies only your
+committed code (none of your data), and walks you through the rest: their Strava login (use a
+private browser window so it isn't your account), secrets, Pages, the first upload and the first
+update. If it stops part-way, run it again and it carries on.
+
+**Or they run it themselves** with their own copy:
 
 1. They make a GitHub account and click **Fork** on your repository (this copies the code – not
    your data, which stays locked with your password; they should delete the `state/` folder in their copy).
