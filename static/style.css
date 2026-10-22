@@ -331,7 +331,7 @@ span.tag { cursor: default; }
 .interval-row.split-head { min-height: 26px; padding: 0; }
 .interval-name { font-weight: 600; line-height: 1.2; }
 .interval-name .muted { font-weight: 400; white-space: nowrap; }
-.interval-row.walk .interval-name { font-weight: 400; color: var(--muted); }
+.interval-row.walk .interval-name, .interval-row.jog .interval-name { font-weight: 400; color: var(--muted); }
 .interval-row.step { min-height: 36px; padding: 3px 0; border-bottom-style: dashed; font-size: 0.88rem; }
 .interval-row.step .interval-name { font-weight: 400; padding-left: 12px; }
 .interval-row.step .split-bar { opacity: .7; height: 70%; margin-top: 2px; }

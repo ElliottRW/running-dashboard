@@ -207,6 +207,8 @@ INTERVAL_MIN_S = 20         # blips shorter than this (speeding up/slowing down)
 STEP_CHANGE_KMH = 0.3       # a belt-speed change of at least this starts a new step
 STEP_MIN_S = 15             # shorter steps are just the belt changing speed
 PROGRESSION_KMH = 1.0       # one block whose belt speed rises at least this much is a progression run
+RECOVERY_DROP_KMH = 4.0    # running this much slower than a block's fastest step, between faster
+                            # stretches, is a jog recovery – it splits the block into separate reps
 
 
 def interp(xs, ys, x):
@@ -330,12 +332,18 @@ def intervals(time, dist, speed_stream=None):
             blocks[-1][3] += dur[i]
         else:
             blocks.append([i, i, running, dur[i]])
-    # A few seconds at either end is just the belt starting or stopping
+    # A few slow seconds at either end is just the belt starting or stopping
+    while blocks and not blocks[0][2] and blocks[0][3] < INTERVAL_MIN_S:
+        blocks.pop(0)
+    while blocks and not blocks[-1][2] and blocks[-1][3] < INTERVAL_MIN_S:
+        blocks.pop()
+    # Then merge blips: a belt held right at the threshold flickers between running and
+    # walking, and trimming those blips off the ends one by one would eat the whole warm-up
+    blocks = _merge_short(blocks, INTERVAL_MIN_S, lambda a, b: a[2] == b[2])
     while blocks and blocks[0][3] < INTERVAL_MIN_S:
         blocks.pop(0)
     while blocks and blocks[-1][3] < INTERVAL_MIN_S:
         blocks.pop()
-    blocks = _merge_short(blocks, INTERVAL_MIN_S, lambda a, b: a[2] == b[2])
 
     def stretch(a, b):
         """Time, distance and pace from sample a to sample b (a block covers a-1 → b)."""
@@ -346,14 +354,36 @@ def intervals(time, dist, speed_stream=None):
 
     rows, run_no = [], 0
     for a, b, running, _ in blocks:
-        row = {"kind": "run" if running else "walk", **stretch(a, b)}
-        if running:
-            run_no += 1
-            row["number"] = run_no
-            row["steps"] = [{"kmh": round(kmh, 1), **stretch(a + i, a + j)}
-                            for i, j, kmh, _ in _speed_steps(speed[a:b + 1], dur[a:b + 1])]
-        rows.append(row)
+        if not running:
+            rows.append({"kind": "walk", **stretch(a, b)})
+            continue
+        for kind, steps in _split_recoveries(_speed_steps(speed[a:b + 1], dur[a:b + 1])):
+            row = {"kind": kind, **stretch(a + steps[0][0], a + steps[-1][1])}
+            if kind == "run":
+                run_no += 1
+                row["number"] = run_no
+                row["steps"] = [{"kmh": round(kmh, 1), **stretch(a + i, a + j)} for i, j, kmh, _ in steps]
+            else:
+                row["kmh"] = round(sum(st[2] * st[3] for st in steps) / max(sum(st[3] for st in steps), 1), 1)
+            rows.append(row)
     return rows if run_no else []
+
+
+def _split_recoveries(steps):
+    """Split one run block's steps into reps and the jog recoveries between them, e.g.
+    12.7 → 7.3 → 12.7 km/h is two reps with a jog in between. Returns [("run" | "jog", steps)].
+    Blocks without at least two faster stretches (steady or progression runs) stay whole."""
+    top = max(st[2] for st in steps)
+    groups = []
+    for st in steps:
+        kind = "jog" if st[2] <= top - RECOVERY_DROP_KMH else "run"
+        if groups and groups[-1][0] == kind:
+            groups[-1][1].append(st)
+        else:
+            groups.append((kind, [st]))
+    if sum(1 for kind, _ in groups if kind == "run") < 2:
+        return [("run", steps)]
+    return groups
 
 
 def _speed_steps(speed, dur):
@@ -399,9 +429,15 @@ def treadmill_session(rows):
     word, warm_jog = "blocks", None
     if len(runs) >= 2:
         reps = runs
-        gaps = [r for k, r in enumerate(rows) if r["kind"] == "walk" and 0 < k < len(rows) - 1]
-        gap_word = "walk" if all(g["pace_s_per_km"] and g["pace_s_per_km"] > 1000 / INTERVAL_RUN_SPEED
-                                 for g in gaps) else "walk or stop"
+        first, last = rows.index(runs[0]), rows.index(runs[-1])
+        gaps = [r for r in rows[first:last] if r["kind"] != "run"]
+        if all(g["kind"] == "jog" for g in gaps):
+            gap_word = "jog"
+        elif any(g["kind"] == "jog" for g in gaps):
+            gap_word = "recovery"
+        else:
+            gap_word = "walk" if all(g["pace_s_per_km"] and g["pace_s_per_km"] > 1000 / INTERVAL_RUN_SPEED
+                                     for g in gaps) else "walk or stop"
         shape = (f"An interval session: {len(reps)} running blocks ({_durations(reps)}) with "
                  + (f"a {fmt_time(gaps[0]['seconds'])} {gap_word} in between." if len(gaps) == 1
                     else f"{gap_word}s of {_durations(gaps)} in between."))
@@ -478,6 +514,9 @@ def _warm_cool(rows, warm_jog=None):
     if warm_jog:
         notes.append({"topic": "warmup", "text":
             f"You warmed up with {fmt_time(warm_jog['seconds'])} of easy running at {warm_jog['kmh']} km/h."})
+    elif first["kind"] == "jog":
+        notes.append({"topic": "warmup", "text":
+            f"You warmed up with {fmt_time(first['seconds'])} of easy running at {first['kmh']} km/h."})
     elif first["kind"] == "run" and first["start_s"] < 60:
         notes.append({"topic": "warmup", "flag": True, "text":
             "You went straight into running with no warm-up. A few minutes of walking or easy jogging "

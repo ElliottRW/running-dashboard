@@ -194,7 +194,7 @@ function intervalsSection(blocks, session) {
       el("div", { class: "num", role: "cell" }, distance),
       el("div", { class: "num split-pace", role: "cell" }, fmt.pace(r.pace_s_per_km, false)));
   const rows = blocks.flatMap((b) => [
-    row(b, b.kind, b.kind === "run" ? `Run ${b.number}` : "Walk", fmt.km(b.metres)),
+    row(b, b.kind, { run: `Run ${b.number}`, jog: "Jog" }[b.kind] || "Walk", fmt.km(b.metres)),
     ...(b.kind === "run" && b.steps.length > 1
       ? b.steps.map((st) => row(st, "step", `${st.kmh} km/h`, `${st.metres} m`)) : []),
   ]);
@@ -204,7 +204,7 @@ function intervalsSection(blocks, session) {
     el("h2", {}, { intervals: "Treadmill intervals", progression: "Progression run" }[session] || "Treadmill breakdown"),
     el("p", { class: "muted small" },
       `${runs.length} running ${runs.length === 1 ? "block" : "blocks"}: ${fmt.duration(runTime)} and ${fmt.km(runMetres)} `,
-      `at ${fmt.pace(runTime / (runMetres / 1000))} on average, with walking or stops left out. `,
+      `at ${fmt.pace(runTime / (runMetres / 1000))} on average, with recoveries and stops left out. `,
       "Under each block is every belt speed you ran at. The bar shows speed: the longer it is, the faster you were going."),
     el("div", { class: "splits intervals", role: "table", "aria-label": "Treadmill intervals" },
       el("div", { class: "interval-row split-head", role: "row" },
