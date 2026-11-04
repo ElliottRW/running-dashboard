@@ -181,7 +181,7 @@ def runs_payload():
     for r in everything:
         r["duplicate_of"] = dupes.get(r["id"])
     return dict(runs=runs, activities=activities, pbs=personal_bests(runs), tags=db.all_tags(),
-                new_ids=db.get_meta("last_sync_new_ids", []))
+                new_ids=db.get_meta("last_sync_new_ids", []), plan=db.get_meta("plan"))
 
 
 @app.get("/api/runs")

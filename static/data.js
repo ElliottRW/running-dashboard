@@ -92,7 +92,7 @@ const DATA = (() => {
 
     async runs() {
       if (!IS_STATIC) return getJSON("/api/runs");
-      return { runs: index.runs, activities: index.activities || [], pbs: index.pbs, tags: index.tags, new_ids: index.new_ids };
+      return { runs: index.runs, activities: index.activities || [], pbs: index.pbs, tags: index.tags, new_ids: index.new_ids, plan: index.plan };
     },
 
     async run(id) {

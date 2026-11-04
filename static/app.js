@@ -133,13 +133,15 @@ function poll() {
 }
 
 // Simple page switching using the part of the address after "#"
-const PAGES = ["overview", "list", "activities", "run", "compare"];
+const PAGES = ["overview", "list", "activities", "run", "compare", "plan"];
 function route() {
   if (!DATA.isUnlocked()) return;
+  showPlanLink();
   const run = location.hash.match(/^#\/run\/(\d+)/);
   const cmp = location.hash.match(/^#\/compare\/?([\d,]*)/);
   const page = run ? "run" : cmp ? "compare" : location.hash.startsWith("#/runs") ? "list"
-    : location.hash.startsWith("#/activities") ? "activities" : "overview";
+    : location.hash.startsWith("#/activities") ? "activities"
+    : location.hash.startsWith("#/plan") ? "plan" : "overview";
   for (const p of PAGES) $(`page-${p}`).hidden = p !== page;
   setNav(page === "run" ? "list" : page);   // the run page moves this to "activities" for a walk, ride…
   if (page !== "run" && runMap) { runMap.remove(); runMap = null; }
@@ -147,6 +149,7 @@ function route() {
   if (page === "overview") renderOverview();
   if (page === "list") renderRuns();
   if (page === "activities") renderActivities();
+  if (page === "plan") renderPlan();
   if (run) renderRunPage(Number(run[1]));
   if (cmp) renderComparePage([...new Set(cmp[1].split(",").filter(Boolean).map(Number))].slice(0, MAX_COMPARE));
   window.scrollTo(0, 0);
