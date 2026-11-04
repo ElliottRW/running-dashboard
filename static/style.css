@@ -518,6 +518,7 @@ span.tag { cursor: default; }
 .plan-session-text { display: grid; gap: 1px; min-width: 0; }
 .plan-session.ticked .plan-what { color: var(--muted); text-decoration: line-through; }
 .plan-session.race .plan-what { font-family: var(--display); font-size: 1.2rem; }
+.plan-strava { color: var(--good); font-weight: 500; }
 .plan-past { margin-top: 4px; }
 .plan-past summary { cursor: pointer; min-height: 44px; }
 .plan-past .plan-week { margin-top: 16px; }

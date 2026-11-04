@@ -1,5 +1,6 @@
 // The training plan: this week and what's next, with sessions to tick off. The plan itself
-// lives in the locked data ("plan" in the database). Ticks stay in this browser, as the
+// lives in the locked data ("plan" in the database). Recorded runs tick their session by
+// themselves; ticks you change by hand stay in this browser and win over the runs, as the
 // website has no server to save them to.
 
 const PLAN_TICKS = "running-dashboard-plan-ticks";
@@ -20,14 +21,46 @@ function planWeekDays(week) {
   return [...Array(7)].map((_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
 }
 
-function planSessionRow(session, ticks, onChange) {
-  const done = () => (session.id in ticks ? ticks[session.id] : !!session.done);
+// Which recorded run belongs to which session: { session id: run }. On a day with two
+// sessions, a treadmill run goes to the treadmill session and an outdoor run to the outdoor
+// one; a run that doesn't fit either way (a road run instead of the treadmill) takes
+// whatever session is left that day.
+function planRunMatches(weeks, runs) {
+  const matches = {};
+  const byDay = {};
+  for (const r of runs) {
+    if (r.duplicate_of) continue;
+    (byDay[r.start_date_local.slice(0, 10)] ||= []).push(r);
+  }
+  for (const s of weeks.flatMap((w) => w.sessions)) (byDay[s.date] ||= []);
+  for (const [day, dayRuns] of Object.entries(byDay)) {
+    const open = weeks.flatMap((w) => w.sessions).filter((s) => s.date === day);
+    const left = [...dayRuns].sort((a, b) => a.start_epoch - b.start_epoch);
+    const assign = (fits) => {
+      for (const s of [...open]) {
+        const i = left.findIndex((r) => fits(s, r));
+        if (i < 0) continue;
+        matches[s.id] = left.splice(i, 1)[0];
+        open.splice(open.indexOf(s), 1);
+      }
+    };
+    assign((s, r) => s.outdoors === !r.trainer);
+    assign(() => true);
+  }
+  return matches;
+}
+
+function planSessionRow(session, plan, onChange) {
+  const { ticks, matches, isDone } = plan;
   const box = el("input", { type: "checkbox", class: "plan-box", id: `plan-${session.id}` });
-  box.checked = done();
-  const row = el("label", { class: `plan-session${done() ? " ticked" : ""}${session.race ? " race" : ""}` }, box,
+  box.checked = isDone(session);
+  const run = matches[session.id];
+  const metres = run && ((run.stats && run.stats.distance_m) || run.summary_distance);
+  const row = el("label", { class: `plan-session${isDone(session) ? " ticked" : ""}${session.race ? " race" : ""}` }, box,
     el("span", { class: "plan-session-text" },
       el("span", { class: "plan-what" }, session.what),
-      el("span", { class: "plan-how muted small" }, `${session.outdoors ? "Outdoors" : "Treadmill"} · ${session.how}`)));
+      el("span", { class: "plan-how muted small" }, `${session.outdoors ? "Outdoors" : "Treadmill"} · ${session.how}`),
+      run ? el("span", { class: "plan-strava small" }, `On Strava: ${metres ? `${(metres / 1000).toFixed(1)} km` : run.name}`) : null));
   box.onchange = () => {
     ticks[session.id] = box.checked;
     savePlanTicks(ticks);
@@ -37,7 +70,7 @@ function planSessionRow(session, ticks, onChange) {
   return row;
 }
 
-function planWeekCard(week, thisWeek, ticks, onChange) {
+function planWeekCard(week, thisWeek, plan, onChange) {
   const days = planWeekDays(week).map((day, i) => {
     const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
     const sessions = week.sessions.filter((s) => s.date === iso);
@@ -46,7 +79,7 @@ function planWeekCard(week, thisWeek, ticks, onChange) {
       el("div", { class: "plan-date muted small" }, planDay(day, { weekday: "short", day: "numeric", month: "short" })),
       el("div", { class: "plan-items" },
         ...classes.map((c) => el("div", { class: "plan-class small" }, c)),
-        ...sessions.map((s) => planSessionRow(s, ticks, onChange)),
+        ...sessions.map((s) => planSessionRow(s, plan, onChange)),
         !classes.length && !sessions.length ? el("div", { class: "plan-rest muted small" }, "Rest") : null));
   });
   return el("section", { class: `plan-week${thisWeek ? " now" : ""}` },
@@ -59,7 +92,7 @@ function planWeekCard(week, thisWeek, ticks, onChange) {
 }
 
 async function renderPlan() {
-  const { plan } = await DATA.runs();
+  const { plan, runs } = await DATA.runs();
   const page = $("page-plan");
   if (!plan) {
     page.replaceChildren(el("section", { class: "card" }, el("h2", {}, "Training plan"),
@@ -70,13 +103,15 @@ async function renderPlan() {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const sessions = plan.weeks.flatMap((w) => w.sessions);
-  const isDone = (s) => (s.id in ticks ? ticks[s.id] : !!s.done);
+  const matches = planRunMatches(plan.weeks, runs);
+  const isDone = (s) => (s.id in ticks ? ticks[s.id] : !!s.done || s.id in matches);
+  const state = { ticks, matches, isDone };
   const daysLeft = Math.round((planDate(plan.race) - today) / 864e5);
 
   const progress = el("p", { class: "muted small" });
   const next = el("div", { class: "plan-next" });
   const update = () => {
-    progress.textContent = `${sessions.filter(isDone).length} of ${sessions.length} sessions done. Ticks are saved on this device.`;
+    progress.textContent = `${sessions.filter(isDone).length} of ${sessions.length} sessions done. Runs on Strava tick themselves after each update. Ticks you change are saved on this device.`;
     const upcoming = sessions.find((s) => planDate(s.date) >= today && !isDone(s));
     next.replaceChildren(...(upcoming ? [
       el("div", { class: "muted small" }, `Next: ${planDay(planDate(upcoming.date), { weekday: "long", day: "numeric", month: "short" })}`),
@@ -98,9 +133,9 @@ async function renderPlan() {
       el("p", { class: "muted small" }, `${daysLeft > 0 ? `${daysLeft} days to go. ` : ""}${plan.summary}`),
       next, progress),
     el("section", { class: "card plan-weeks" },
-      ...current.map((w) => planWeekCard(w, isNow(w), ticks, update)),
+      ...current.map((w) => planWeekCard(w, isNow(w), state, update)),
       past.length ? el("details", { class: "plan-past" }, el("summary", { class: "small" }, `Earlier weeks (${past.length})`),
-        ...past.map((w) => planWeekCard(w, false, ticks, update))) : null),
+        ...past.map((w) => planWeekCard(w, false, state, update))) : null),
     ...(plan.guide || []).map((g) => el("section", { class: "card" },
       el("h2", {}, g.title),
       el("div", { class: "plan-guide small" }, ...g.rows.map(([a, b]) => el("div", { class: "plan-guide-row" }, el("span", {}, a), el("span", { class: "num" }, b)))),
