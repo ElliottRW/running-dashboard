@@ -44,7 +44,7 @@ function planRunMatches(weeks, runs) {
         open.splice(open.indexOf(s), 1);
       }
     };
-    assign((s, r) => s.outdoors === !r.trainer);
+    assign((s, r) => s.outdoors === !isTreadmillRun(r));
     assign(() => true);
   }
   return matches;

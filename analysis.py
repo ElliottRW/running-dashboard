@@ -5,7 +5,10 @@ the watch's distance recording, then to Strava's summary distance.
 """
 import math
 
-STATS_VERSION = 3           # bump when the maths changes, so stats get recalculated
+STATS_VERSION = 4           # bump when the maths changes, so stats get recalculated
+# Treadmill heart rate is shown from this day on. Before it, it's left out: the treadmill's
+# sensor once froze on one value for 13 minutes. Keep in step with static/runs.js.
+TREADMILL_HR_FROM = "2026-11-10"
 RUN_TYPES = {"Run", "TrailRun"}  # everything else (walks, rides…) is an "other activity"
 RIDE_TYPES = {"Ride", "VirtualRide", "EBikeRide", "EMountainBikeRide", "GravelRide", "MountainBikeRide",
               "Handcycle", "Velomobile"}
@@ -38,15 +41,25 @@ def is_run(activity):
     return (activity or {}).get("sport_type") in RUN_TYPES
 
 
+TREADMILL_TAG = "treadmill"  # tag a run this on the Mac when Strava doesn't know it was on a treadmill
+
+
 def is_treadmill_run(activity):
-    return is_run(activity) and bool((activity or {}).get("trainer"))
+    """Strava marked it as indoor, or you tagged it "Treadmill" – e.g. a run you uploaded
+    yourself from a file, which Strava has no way to mark. Keep in step with static/runs.js."""
+    a = activity or {}
+    return is_run(a) and (bool(a.get("trainer")) or (a.get("tag") or "").strip().lower() == TREADMILL_TAG)
+
+
+def treadmill_hr_ignored(activity):
+    """True for treadmill runs from before TREADMILL_HR_FROM, whose heart rate is left out."""
+    return is_treadmill_run(activity) and ((activity or {}).get("start_date_local") or "") < TREADMILL_HR_FROM
 
 
 def heart_rate(activity, streams):
-    """The heart rate recording, or None. Treadmill runs are left out: neither the
-    treadmill's sensor nor a wrist watch tracks it reliably there."""
+    """The heart rate recording, or None (also None for older treadmill runs – see TREADMILL_HR_FROM)."""
     hr = streams.get("heartrate")
-    if not hr or len(hr) != len(streams.get("time") or []) or is_treadmill_run(activity):
+    if not hr or len(hr) != len(streams.get("time") or []) or treadmill_hr_ignored(activity):
         return None
     return hr
 
@@ -673,18 +686,23 @@ def detail(activity, streams):
             out["intervals"] = intervals(time, dist, streams.get("velocity_smooth"))
             out["session"], notes = treadmill_session(out["intervals"])
             # Interval and progression sessions get their own notes; steady runs keep the
-            # usual ones, minus heart rate (ignored on a treadmill)
-            out["summary"] = notes or [n for n in out["summary"] if n["topic"] != "hr"]
+            # usual ones (minus heart rate on older treadmill runs, where it's ignored)
+            out["summary"] = notes or [n for n in out["summary"]
+                                       if not (n["topic"] == "hr" and treadmill_hr_ignored(activity))]
     else:
         # No distance recording at all (e.g. some treadmill runs): heart rate by time only
         out["series"] = {"x_min": [round(time[i] / 60, 2) for i in idx],
                          "hr": [hr[i] for i in idx] if hr else None}
         out["splits"] = []
         if is_treadmill_run(activity):
-            out["summary"] = [{"topic": "pacing", "text":
-                               "This treadmill run has no distance recording, so there are no km splits, "
-                               "intervals or pacing notes. Heart rate isn't shown on treadmill runs either, "
-                               "as it can't be tracked reliably there."}]
+            no_distance = ("This treadmill run has no distance recording, so there are no km splits, "
+                           "intervals or pacing notes")
+            if treadmill_hr_ignored(activity):
+                text = f"{no_distance}. Heart rate isn't shown on treadmill runs from before 10 Nov 2026 either, " \
+                       "as it couldn't be tracked reliably then."
+            else:
+                text = f"{no_distance} – but your heart rate is shown below." if hr else f"{no_distance}."
+            out["summary"] = [{"topic": "pacing", "text": text}]
         else:
             out["summary"] = [{"topic": "pacing", "text":
                                "This run has no distance recording, so there are no km splits or pacing "

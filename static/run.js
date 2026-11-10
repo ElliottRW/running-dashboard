@@ -18,7 +18,7 @@ async function renderRunPage(id) {
   const { run, detail } = found;
   currentRun = { run, detail };
   const s = run.stats || {};
-  const noHr = (run.streams_status === "done" && !run.has_hr) || isTreadmillRun(run);
+  const noHr = (run.streams_status === "done" && !run.has_hr) || treadmillHrIgnored(run);
   const isRun = isRunType(run);
   if (!isRun) setNav("activities");
   const metres = s.distance_m ?? run.summary_distance;

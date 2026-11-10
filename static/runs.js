@@ -79,16 +79,19 @@ function runBadges(r) {
   if (r.streams_status === "missing") b.push(["No detailed data", r.streams_note]);
   // A gym session or yoga class never has GPS – only mention it when there was some distance
   const onTheMove = isRunType(r) || (r.summary_distance || 0) > 0;
-  if (r.streams_status === "done" && !r.has_gps && onTheMove) b.push([r.trainer ? (isRunType(r) ? "Treadmill – no GPS" : "Indoor – no GPS") : "No GPS",
-    isTreadmillRun(r) ? "No map or GPS-based stats. Heart rate is left out too – it can't be tracked reliably on a treadmill."
+  if (r.streams_status === "done" && !r.has_gps && onTheMove) b.push([isTreadmillRun(r) ? "Treadmill – no GPS" : r.trainer ? "Indoor – no GPS" : "No GPS",
+    treadmillHrIgnored(r) ? "No map or GPS-based stats. Heart rate is left out too – it couldn't be tracked reliably on a treadmill before 10 Nov 2026."
       : r.streams_note || "No map or GPS-based stats for this one."]);
-  if (r.streams_status === "done" && !r.has_hr && !isTreadmillRun(r)) b.push(["No heart rate", "Your watch didn't record heart rate on this one."]);
+  if (r.streams_status === "done" && !r.has_hr && !treadmillHrIgnored(r)) b.push(["No heart rate", "Your watch didn't record heart rate on this one."]);
   return b.map(([text, title]) => el("span", { class: "badge", title }, text));
 }
 
 const isRunType = (r) => r.sport_type === "Run" || r.sport_type === "TrailRun";
-// Heart rate can't be tracked reliably on a treadmill, so it's left out of those runs
-const isTreadmillRun = (r) => !!r.trainer && isRunType(r);
+// Strava marked it as indoor, or you tagged it "Treadmill" (for runs uploaded from a file). Keep in step with analysis.py.
+const isTreadmillRun = (r) => isRunType(r) && (!!r.trainer || (r.tag || "").trim().toLowerCase() === "treadmill");
+// Treadmill heart rate is left out before this day (it wasn't reliable then). Keep in step with analysis.py.
+const TREADMILL_HR_FROM = "2026-11-10";
+const treadmillHrIgnored = (r) => isTreadmillRun(r) && (r.start_date_local || "") < TREADMILL_HR_FROM;
 
 function renderRunList() {
   const { runs } = runsData;
@@ -100,7 +103,7 @@ function renderRunList() {
 
   $("run-rows").replaceChildren(...shown.map((r) => {
     const s = r.stats || {};
-    const noHr = (r.streams_status === "done" && !r.has_hr) || isTreadmillRun(r);
+    const noHr = (r.streams_status === "done" && !r.has_hr) || treadmillHrIgnored(r);
     const row = el("tr", { class: `run-row${r.duplicate_of ? " is-dup" : ""}` },
       el("td", { class: "date", "data-label": "Date" },
         el("div", {}, fmt.day(r.start_date_local)),

@@ -289,6 +289,8 @@ def list_runs_with_stats():
 def set_tag(activity_id, tag):
     with _lock, connect() as conn:
         conn.execute("UPDATE activities SET tag = ? WHERE id = ?", (tag or None, activity_id))
+        # A "Treadmill" tag changes how the run is worked out, so its stats get recalculated
+        conn.execute("DELETE FROM run_stats WHERE activity_id = ?", (activity_id,))
 
 
 def all_tags():

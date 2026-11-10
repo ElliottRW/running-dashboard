@@ -188,6 +188,13 @@ update. If it stops part-way, run it again and it carries on.
 - **Pace** uses moving time (stops don't count) and is smoothed over ~30 seconds in charts.
 - **Personal bests** check every possible stretch of 1 / 5 / 10 km inside every GPS run.
 - **Climb** is from lightly smoothed height data, ignoring wobbles under 1 m.
+- **Treadmill runs** are the ones Strava marks as indoor, plus any run you tag **Treadmill** on the Mac.
+  Use the tag for runs you've uploaded yourself from a file (e.g. two treadmill sessions joined into
+  one), since Strava has no way to mark those. They get the treadmill breakdown and notes, and tick
+  treadmill sessions on the Plan page.
+- **Heart rate on treadmill runs** is left out before 10 Nov 2026 – back
+  then the readings weren't reliable – and shown from that day on, so those runs also count towards
+  **Hard runs**. The date is `TREADMILL_HR_FROM` in [`analysis.py`](analysis.py) and `static/runs.js`.
 - **"How it went"** notes are simple rules in [`analysis.py`](analysis.py) (`summarise`): first km
   vs the rest (±4%), first half vs second half (±2–3%), and heart rate rising ≥3 bpm while pace held.
 - **This week's check-in** covers Monday to today. **Hard runs**: average heart rate above 85% of the
