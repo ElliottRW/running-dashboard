@@ -45,10 +45,11 @@ TREADMILL_TAG = "treadmill"  # tag a run this on the Mac when Strava doesn't kno
 
 
 def is_treadmill_run(activity):
-    """Strava marked it as indoor, or you tagged it "Treadmill" – e.g. a run you uploaded
+    """Strava marked it as indoor, or one of your tags is "Treadmill" – e.g. a run you uploaded
     yourself from a file, which Strava has no way to mark. Keep in step with static/runs.js."""
     a = activity or {}
-    return is_run(a) and (bool(a.get("trainer")) or (a.get("tag") or "").strip().lower() == TREADMILL_TAG)
+    tags = [t.strip().lower() for t in (a.get("tag") or "").split(",")]
+    return is_run(a) and (bool(a.get("trainer")) or TREADMILL_TAG in tags)
 
 
 def treadmill_hr_ignored(activity):

@@ -133,6 +133,7 @@ The backup contains your Strava login, so keep it somewhere private.
 - Just open the website. It updates itself each morning.
 - After a run, press **Update → Run workflow** if you don't want to wait.
 - **Tagging runs** happens on the Mac: `cloud.py pull` → tag in the Mac version → `cloud.py push`.
+  A run can have several tags – type them separated by commas, e.g. `Gym: Run Club, Treadmill`.
   ```bash
   .venv/bin/python cloud.py pull
   ```
@@ -188,7 +189,8 @@ update. If it stops part-way, run it again and it carries on.
 - **Pace** uses moving time (stops don't count) and is smoothed over ~30 seconds in charts.
 - **Personal bests** check every possible stretch of 1 / 5 / 10 km inside every GPS run.
 - **Climb** is from lightly smoothed height data, ignoring wobbles under 1 m.
-- **Treadmill runs** are the ones Strava marks as indoor, plus any run you tag **Treadmill** on the Mac.
+- **Treadmill runs** are the ones Strava marks as indoor, plus any run with a **Treadmill** tag on the Mac
+  (on its own or alongside other tags).
   Use the tag for runs you've uploaded yourself from a file (e.g. two treadmill sessions joined into
   one), since Strava has no way to mark those. They get the treadmill breakdown and notes, and tick
   treadmill sessions on the Plan page.

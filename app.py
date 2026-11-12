@@ -252,7 +252,7 @@ def config_js():
 
 @app.post("/api/runs/<int:activity_id>/tag")
 def api_set_tag(activity_id):
-    tag = ((request.get_json(silent=True) or {}).get("tag") or "").strip()[:40]
+    tag = db.normalise_tags((request.get_json(silent=True) or {}).get("tag") or "")
     db.set_tag(activity_id, tag)
     return jsonify(ok=True, tag=tag or None)
 

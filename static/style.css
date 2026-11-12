@@ -261,7 +261,8 @@ tr.is-dup { opacity: .5; }
 span.tag { cursor: default; }
 .tag.empty { background: none; border: 1px dashed var(--border); color: var(--faint); }
 .tag.empty:hover { color: var(--text); border-color: var(--muted); }
-.tag-input { font: inherit; font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--text); width: 140px; background: var(--raised); color: var(--text); }
+.tag-group { display: contents; }   /* each tag sits in the badge row like any other badge */
+.tag-input { font: inherit; font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--text); width: 220px; max-width: 100%; background: var(--raised); color: var(--text); }
 @media (hover: hover) { .runs-table tbody tr:hover { background: var(--wash); } }
 
 /* ---------- single run ---------- */

@@ -286,7 +286,25 @@ def list_runs_with_stats():
     return out
 
 
+def split_tags(text):
+    """A run's tags are kept in one field, separated by commas: "Gym: Run Club, Treadmill"."""
+    return [t.strip() for t in (text or "").split(",") if t.strip()]
+
+
+def normalise_tags(text):
+    """Tidy what was typed: trims each tag to 40 characters and drops repeats (ignoring case)."""
+    out, seen = [], set()
+    for t in split_tags(text):
+        t = t[:40].strip()
+        if t.lower() not in seen:
+            seen.add(t.lower())
+            out.append(t)
+    return ", ".join(out)
+
+
 def set_tag(activity_id, tag):
+    """Sets all of a run's tags at once – several are separated by commas."""
+    tag = normalise_tags(tag)
     with _lock, connect() as conn:
         conn.execute("UPDATE activities SET tag = ? WHERE id = ?", (tag or None, activity_id))
         # A "Treadmill" tag changes how the run is worked out, so its stats get recalculated
@@ -295,6 +313,5 @@ def set_tag(activity_id, tag):
 
 def all_tags():
     with connect() as conn:
-        rows = conn.execute("SELECT DISTINCT tag FROM activities WHERE tag IS NOT NULL "
-                            "ORDER BY tag").fetchall()
-    return [r["tag"] for r in rows]
+        rows = conn.execute("SELECT DISTINCT tag FROM activities WHERE tag IS NOT NULL").fetchall()
+    return sorted({t for r in rows for t in split_tags(r["tag"])}, key=str.lower)

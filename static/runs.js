@@ -6,7 +6,7 @@ let runsData = null;
 async function renderRuns() {
   runsData = await DATA.runs();
   // The filter only offers tags you've used on runs; suggestions include every tag
-  renderTagOptions(runsData.tags, [...new Set(runsData.runs.map((r) => r.tag).filter(Boolean))].sort());
+  renderTagOptions(runsData.tags, [...new Set(runsData.runs.flatMap(tagsOf))].sort((a, b) => a.localeCompare(b)));
   renderRunList();
 }
 
@@ -87,8 +87,10 @@ function runBadges(r) {
 }
 
 const isRunType = (r) => r.sport_type === "Run" || r.sport_type === "TrailRun";
-// Strava marked it as indoor, or you tagged it "Treadmill" (for runs uploaded from a file). Keep in step with analysis.py.
-const isTreadmillRun = (r) => isRunType(r) && (!!r.trainer || (r.tag || "").trim().toLowerCase() === "treadmill");
+// A run's tags are kept in one field, separated by commas: "Gym: Run Club, Treadmill". Keep in step with db.py.
+const tagsOf = (r) => (r.tag || "").split(",").map((t) => t.trim()).filter(Boolean);
+// Strava marked it as indoor, or one of your tags is "Treadmill" (for runs uploaded from a file). Keep in step with analysis.py.
+const isTreadmillRun = (r) => isRunType(r) && (!!r.trainer || tagsOf(r).some((t) => t.toLowerCase() === "treadmill"));
 // Treadmill heart rate is left out before this day (it wasn't reliable then). Keep in step with analysis.py.
 const TREADMILL_HR_FROM = "2026-11-10";
 const treadmillHrIgnored = (r) => isTreadmillRun(r) && (r.start_date_local || "") < TREADMILL_HR_FROM;
@@ -97,7 +99,7 @@ function renderRunList() {
   const { runs } = runsData;
   $("runs").hidden = runs.length === 0;
   const filter = $("tag-filter").value;
-  const shown = runs.filter((r) => !filter || (filter === "__untagged" ? !r.tag : r.tag === filter));
+  const shown = runs.filter((r) => !filter || (filter === "__untagged" ? !tagsOf(r).length : tagsOf(r).includes(filter)));
   $("run-count").textContent = filter ? `(${shown.length} of ${runs.length})` : `(${runs.length})`;
   const newIds = new Set(runsData.new_ids);
 
@@ -134,24 +136,32 @@ function pill(kind, text) {
 
 // ---------- your own tags ----------
 
+// One chip per tag. A run can have several – type them separated by commas.
 function tagChip(r) {
+  const tags = tagsOf(r);
   // On the website tags are read-only (it has no server to save them to)
-  if (!DATA.canEditTags) return r.tag ? el("span", { class: "tag" }, r.tag) : null;
-  const chip = el("button", { class: `tag${r.tag ? "" : " empty"}`, type: "button",
-    title: r.tag ? "Change or remove this tag" : "Add your own label, e.g. easy or group run" },
-    r.tag ? r.tag : "+ tag");
-  chip.addEventListener("click", () => editTag(chip, r));
-  return chip;
+  if (!DATA.canEditTags) return tags.map((t) => el("span", { class: "tag" }, t));
+  const group = el("span", { class: "tag-group" });
+  const open = () => editTag(group, r);
+  if (!tags.length) {
+    group.append(el("button", { class: "tag empty", type: "button", onclick: open,
+      title: "Add your own label, e.g. easy or group run – separate several with commas" }, "+ tag"));
+  }
+  for (const t of tags) {
+    group.append(el("button", { class: "tag", type: "button", onclick: open,
+      title: "Change or remove tags – separate several with commas" }, t));
+  }
+  return group;
 }
 
 function editTag(chip, r) {
-  const input = el("input", { class: "tag-input", list: "tag-options", value: r.tag || "",
-    placeholder: "e.g. easy", maxlength: "40", "aria-label": `Tag for ${r.name}` });
+  const input = el("input", { class: "tag-input", list: "tag-options", value: tagsOf(r).join(", "),
+    placeholder: "e.g. easy, group run", maxlength: "160", "aria-label": `Tags for ${r.name}` });
   let done = false;
   const finish = async (save) => {
     if (done) return;
     done = true;
-    if (save && input.value.trim() !== (r.tag || "")) {
+    if (save && input.value.trim() !== tagsOf(r).join(", ")) {
       const res = await getJSON(`/api/runs/${r.id}/tag`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tag: input.value }) });
