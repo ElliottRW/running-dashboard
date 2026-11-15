@@ -192,7 +192,7 @@ update. If it stops part-way, run it again and it carries on.
 - **Treadmill runs** are the ones Strava marks as indoor, plus any run with a **Treadmill** tag on the Mac
   (on its own or alongside other tags).
   Use the tag for runs you've uploaded yourself from a file (e.g. two treadmill sessions joined into
-  one), since Strava has no way to mark those. They get the treadmill breakdown and notes, and tick
+  one, or one with your Fitbit heart rate added – see section 7), since Strava has no way to mark those. They get the treadmill breakdown and notes, and tick
   treadmill sessions on the Plan page.
 - **Heart rate on treadmill runs** is left out before 10 Nov 2026 – back
   then the readings weren't reliable – and shown from that day on, so those runs also count towards
@@ -210,7 +210,38 @@ update. If it stops part-way, run it again and it carries on.
 - **Duplicates** (same start within 2 minutes, distance within 5%) are shown greyed out and left
   out of totals and PBs.
 
-## 7. What's where
+## 7. Adding Fitbit heart rate to a treadmill run
+
+The treadmill sends Strava your distance and speed but no heart rate, and the Fitbit records heart
+rate but no real distance. [`treadmill_merge.py`](treadmill_merge.py) joins them into one run, with
+one lap per treadmill session if you did more than one.
+
+1. Once both have reached Strava, export the run from Fitbit as a TCX file. It lands in Downloads,
+   named with a long number.
+2. **Check the clocks.** The Fitbit's clock and the treadmill's don't always agree (45 s apart on
+   10 Nov 2026, in step on 15 Nov), so do this every time:
+   ```bash
+   .venv/bin/python treadmill_merge.py ~/Downloads/<number>.tcx --github
+   ```
+   It finds the treadmill session(s) the Fitbit was recording during, and shows your heart rate from
+   15 s before to 30 s after each belt change. When the clocks line up, heart rate starts to rise or
+   fall within about 5 s after each change. If it moves *before* the change, the watch is ahead:
+   try again with a lower `--offset`. If it only moves 15 s or more after, try a higher one.
+   `--github` reads the newest data GitHub has synced without changing the data on your Mac. Leave
+   it off if the Mac already has the run. To pick the sessions yourself, put their activity ids (the
+   number in each one's Strava web address) after the file name.
+3. **Write the files** with the offset in seconds that lines them up (`0` if they already agree):
+   ```bash
+   .venv/bin/python treadmill_merge.py ~/Downloads/<number>.tcx --github --offset 0
+   ```
+   This saves `data/<date>-treadmill-merged.fit`, the file marked as a treadmill run that you upload,
+   and a matching `.tcx`.
+4. Upload the `.fit` file at <https://www.strava.com/upload/select> and give the run a name.
+5. On Strava, delete the treadmill session(s) and the Fitbit's own run, so it isn't counted twice.
+6. Strava doesn't mark uploads as indoor, even though the file says treadmill. So once it has synced,
+   give it the **Treadmill** tag on the Mac (`cloud.py pull` → tag → `cloud.py push`).
+
+## 8. What's where
 
 | File | What it does |
 |---|---|
@@ -220,6 +251,7 @@ update. If it stops part-way, run it again and it carries on.
 | `db.py` | The SQLite database |
 | `analysis.py` | All the maths: distance, splits, PBs, notes, compare data |
 | `cloud.py` | The website: locking, privacy zones, building, daily sync |
+| `treadmill_merge.py` | Adding Fitbit heart rate to a treadmill run, ready to upload (section 7) |
 | `static/` | The pages you see (HTML, CSS, JavaScript) |
 | `.github/workflows/sync.yml` | GitHub's daily job |
 | `state/` | Your locked data for the website (safe to be public) |
