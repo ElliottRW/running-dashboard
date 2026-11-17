@@ -150,8 +150,9 @@ function route() {
   if (page === "list") renderRuns();
   if (page === "activities") renderActivities();
   if (page === "plan") renderPlan();
-  if (run) renderRunPage(Number(run[1]));
-  if (cmp) renderComparePage([...new Set(cmp[1].split(",").filter(Boolean).map(Number))].slice(0, MAX_COMPARE));
+  // Run ids stay as text: Strava's 64-bit ids are too big for a JavaScript number (see app.py)
+  if (run) renderRunPage(run[1]);
+  if (cmp) renderComparePage([...new Set(cmp[1].split(",").filter(Boolean))].slice(0, MAX_COMPARE));
   window.scrollTo(0, 0);
 }
 

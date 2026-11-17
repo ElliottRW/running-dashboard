@@ -208,12 +208,12 @@ def build(pw):
             apply_privacy(detail, compare, centres)
         # File names are scrambled so they don't reveal your Strava activity ids
         name = hmac.new(key, str(r["id"]).encode(), hashlib.sha256).hexdigest()[:24]
-        files[r["id"]] = name
+        files[str(r["id"])] = name
         write_json(os.path.join(SITE_DIR, "data", "runs", f"{name}.json"),
                    lock(key, json.dumps({"detail": detail, "compare": compare}).encode()))
 
     auth = db.get_auth() or {}
-    index = dict(payload, files=files, last_sync=db.get_meta("last_sync"),
+    index = dict(webapp.payload_for_browser(payload), files=files, last_sync=db.get_meta("last_sync"),
                  athlete_name=auth.get("athlete_name"),
                  max_hr=db.get_meta("max_hr", webapp.DEFAULT_MAX_HR))
     write_json(os.path.join(SITE_DIR, "data", "index.json"), lock(key, json.dumps(index).encode()))

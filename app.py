@@ -184,9 +184,34 @@ def runs_payload():
                 new_ids=db.get_meta("last_sync_new_ids", []), plan=db.get_meta("plan"))
 
 
+# Strava ids go to the browser as text, not numbers. From June 2027 Strava hands out 64-bit
+# ids, and a browser rounds any whole number above 2^53 (about 9×10^15) – a link or a tag
+# would land on the wrong run. Python keeps them as whole numbers; only what's sent changes.
+
+def run_for_browser(run):
+    out = dict(run, id=str(run["id"]))
+    if out.get("duplicate_of") is not None:
+        out["duplicate_of"] = str(out["duplicate_of"])
+    return out
+
+
+def _pb_for_browser(entry):
+    return entry and dict(entry, run_id=str(entry["run_id"]))
+
+
+def payload_for_browser(payload):
+    """runs_payload() with every Strava id as text – for the Mac app and the website build."""
+    return dict(payload,
+                runs=[run_for_browser(r) for r in payload["runs"]],
+                activities=[run_for_browser(a) for a in payload["activities"]],
+                pbs={k: dict(pb, best=_pb_for_browser(pb["best"]), previous=_pb_for_browser(pb["previous"]))
+                     for k, pb in payload["pbs"].items()},
+                new_ids=[str(i) for i in payload["new_ids"] or []])
+
+
 @app.get("/api/runs")
 def api_runs():
-    return jsonify(runs_payload())
+    return jsonify(payload_for_browser(runs_payload()))
 
 
 @app.get("/api/runs/<int:activity_id>")
@@ -199,7 +224,7 @@ def api_run_detail(activity_id):
     detail = {}
     if activity["streams_status"] == "done":
         detail = analysis.detail(activity, db.get_streams(activity_id))
-    return jsonify(run=run, detail=detail)
+    return jsonify(run=run and run_for_browser(run), detail=detail)
 
 
 @app.get("/api/compare")
@@ -219,7 +244,7 @@ def api_compare():
         s = None
         if activity["streams_status"] == "done":
             s = analysis.compare_series(db.get_activity(i), db.get_streams(i))
-        runs.append(activity)
+        runs.append(run_for_browser(activity))
         series.append(s)
     return jsonify(runs=runs, series=series)
 
